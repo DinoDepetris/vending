@@ -10,6 +10,7 @@ solo de "su" tipo de usuario.
 from flask import Blueprint, render_template, jsonify, request
 
 from datos.inventario import obtener_inventario_completo, obtener_producto, descontar_stock
+from datos.ventas import registrar_venta
 from simuladores import arduino, autorizar_pago_en_servidor
 
 # Un Blueprint es un "grupo de rutas" que se define acá, separado del
@@ -59,6 +60,13 @@ def procesar_pedido_web():
         return jsonify({"ok": False, "mensaje": "Se cobró pero no se detectó la entrega. Contactá soporte"})
 
     descontar_stock(producto)
+
+    # Justo acá, con la venta ya 100% confirmada (pago aprobado y
+    # entrega detectada por el sensor), la anotamos en el historial.
+    # Este es el único lugar de todo el proyecto donde se escribe en la
+    # tabla ventas — así nunca puede quedar una venta anotada que en
+    # realidad no se entregó.
+    registrar_venta(producto, slot["precio"])
 
     slot_actualizado = obtener_producto(producto)
     return jsonify({

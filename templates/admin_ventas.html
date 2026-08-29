@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Historial de ventas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body class="panel-admin">
+    <h2>Historial de ventas</h2>
+
+    <p><strong>{{ total.cantidad }}</strong> ventas totales — <strong>${{ total.total }}</strong> facturados</p>
+
+    <h3>Por producto</h3>
+    <table>
+        <tr><th>Producto</th><th>Cantidad</th><th>Total</th></tr>
+        {% for fila in resumen %}
+        <tr>
+            <td>{{ fila.producto }}</td>
+            <td>{{ fila.cantidad }}</td>
+            <td>${{ fila.total }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h3>Últimas ventas</h3>
+    <table>
+        <tr><th>Fecha y hora</th><th>Producto</th><th>Precio</th></tr>
+        {% for venta in recientes %}
+        <tr>
+            <td>{{ venta.fecha_hora }}</td>
+            <td>{{ venta.producto }}</td>
+            <td>${{ venta.precio }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <p style="margin-top: 24px;">
+        <a href="/admin/ventas/exportar">Descargar CSV completo</a>
+        &nbsp;·&nbsp;
+        <a href="/admin">Volver al panel</a>
+        &nbsp;·&nbsp;
+        <a href="/admin/logout">Cerrar sesión</a>
+    </p>
+</body>
+</html>
