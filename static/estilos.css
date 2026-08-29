@@ -1,0 +1,58 @@
+/* Antes, este bloque de estilos vivía pegado dentro del string de HTML
+   en servidor_vending.py. Separarlo en su propio archivo .css tiene una
+   ventaja concreta: el editor de código ahora te resalta y valida CSS
+   de verdad, cosa que no pasaba bien cuando estaba mezclado adentro de
+   un string de Python. */
+
+body {
+    font-family: sans-serif;
+    max-width: 400px;
+    margin: 40px auto;
+}
+
+button {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#resultado {
+    margin-top: 20px;
+    padding: 12px;
+    background: #eee;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    min-height: 40px;
+}
+
+/* Estilos específicos del panel de administración */
+body.panel-admin {
+    max-width: 480px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    text-align: left;
+    border-bottom: 1px solid #ccc;
+}
+
+.form-reponer {
+    display: flex;
+    gap: 4px;
+}
+
+.form-reponer input[type="number"] {
+    width: 60px;
+}

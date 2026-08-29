@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Panel de reposición</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body class="panel-admin">
+    <h2>Panel de reposición</h2>
+    <form method="POST" action="/admin/login">
+        <input type="password" name="contraseña" placeholder="Contraseña">
+        <button type="submit">Ingresar</button>
+    </form>
+</body>
+</html>

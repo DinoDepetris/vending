@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vending simulado</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+    <h2>Elegí un producto</h2>
+
+    <!-- El bloque for de abajo es un bucle de Jinja (el motor de
+         plantillas de Flask): recorre el diccionario "inventario" que
+         le pasamos desde pagina_principal() en cliente.py, y arma un
+         botón por cada producto. Esto reemplaza el bucle que antes
+         escribíamos a mano en Python, concatenando texto HTML. -->
+    {% for nombre, datos in inventario.items() %}
+        <button id="btn-{{ nombre }}" onclick="pedir('{{ nombre }}')"
+                {% if datos.stock <= 0 %}disabled{% endif %}>
+            {{ nombre }} — ${{ datos.precio }} (stock: {{ datos.stock }})
+        </button>
+    {% endfor %}
+
+    <div id="resultado">Esperando tu selección...</div>
+
+    <script>
+        async function pedir(producto) {
+            document.getElementById("resultado").innerText = "Procesando...";
+            const respuesta = await fetch("/pedido", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ producto: producto })
+            });
+            const datos = await respuesta.json();
+            document.getElementById("resultado").innerText = datos.mensaje;
+        }
+
+        async function actualizarBotones() {
+            const respuesta = await fetch("/estado");
+            const inventario = await respuesta.json();
+            for (const nombre in inventario) {
+                const datos = inventario[nombre];
+                const boton = document.getElementById("btn-" + nombre);
+                if (!boton) continue;
+                boton.innerText = `${nombre} — $${datos.precio} (stock: ${datos.stock})`;
+                boton.disabled = datos.stock <= 0;
+            }
+        }
+
+        setInterval(actualizarBotones, 2000);
+    </script>
+</body>
+</html>

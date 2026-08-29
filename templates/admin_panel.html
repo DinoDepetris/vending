@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Panel de reposición</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body class="panel-admin">
+    <h2>Panel de reposición</h2>
+    <table>
+        <tr><th>Producto</th><th>Stock</th><th>Reponer</th></tr>
+        {% for nombre, datos in inventario.items() %}
+        <tr>
+            <td>{{ nombre }}</td>
+            <td>{{ datos.stock }}</td>
+            <td>
+                <form method="POST" action="/admin/reponer" class="form-reponer">
+                    <input type="hidden" name="producto" value="{{ nombre }}">
+                    <input type="number" name="cantidad" value="10" min="1">
+                    <button type="submit">Reponer</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <p><a href="/admin/logout">Cerrar sesión</a></p>
+</body>
+</html>
