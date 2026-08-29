@@ -1,12 +1,9 @@
 """
-Todo el acceso a la base de datos vive en este archivo. Ninguna otra
-parte del proyecto debería escribir SQL directamente — le piden los
-datos a estas funciones, con nombres que ya explican qué hacen
-(obtener_producto, descontar_stock), sin necesitar saber cómo están
-guardados por dentro.
-
-Esta es la misma lógica que ya tenías en servidor_vending.py — no
-cambió ni una línea de SQL, solo cambió DÓNDE vive el código.
+Todo el acceso al CATÁLOGO de productos vive en este archivo: qué
+productos existen, su precio, su stock. Ya no incluye el slot físico
+—eso ahora vive en datos/slots.py, separado a propósito— porque son dos
+preguntas distintas: "¿qué es la Coca de 500ml y cuánto vale?" (esto) vs
+"¿en qué compuerta física está puesta ahora mismo?" (slots).
 """
 
 import sqlite3
@@ -25,7 +22,6 @@ def inicializar_base_de_datos():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS inventario (
             producto TEXT PRIMARY KEY,
-            slot INTEGER NOT NULL,
             precio INTEGER NOT NULL,
             stock INTEGER NOT NULL
         )
@@ -35,12 +31,12 @@ def inicializar_base_de_datos():
 
     if cantidad == 0:
         productos_iniciales = [
-            ("coca_500", 3, 800, 4),
-            ("agua_500", 5, 600, 2),
-            ("papas_150", 7, 1200, 3),
+            ("coca_500", 800, 4),
+            ("agua_500", 600, 2),
+            ("papas_150", 1200, 3),
         ]
         conn.executemany(
-            "INSERT INTO inventario (producto, slot, precio, stock) VALUES (?, ?, ?, ?)",
+            "INSERT INTO inventario (producto, precio, stock) VALUES (?, ?, ?)",
             productos_iniciales
         )
         conn.commit()
@@ -64,6 +60,22 @@ def obtener_producto(producto):
     return dict(fila) if fila else None
 
 
+def crear_o_actualizar_producto(producto, precio, stock):
+    conn = obtener_conexion()
+
+    # Esto se llama "upsert" (update + insert): si el producto ya existe
+    # (mismo nombre), actualiza su precio y stock; si no existe, lo crea.
+    # ON CONFLICT detecta el choque contra la clave primaria (producto)
+    # y decide qué hacer en ese caso, en una sola consulta.
+    conn.execute("""
+        INSERT INTO inventario (producto, precio, stock)
+        VALUES (?, ?, ?)
+        ON CONFLICT(producto) DO UPDATE SET precio = excluded.precio, stock = excluded.stock
+    """, (producto, precio, stock))
+    conn.commit()
+    conn.close()
+
+
 def descontar_stock(producto):
     conn = obtener_conexion()
     conn.execute(
@@ -81,3 +93,23 @@ def reponer_stock(producto, cantidad):
     )
     conn.commit()
     conn.close()
+
+
+def obtener_productos_en_venta():
+    conn = obtener_conexion()
+
+    # JOIN combina filas de dos tablas distintas que comparten un dato en
+    # común — acá, el nombre del producto. Le pedimos: "traeme cada slot
+    # que tenga un producto puesto, junto con el precio y stock de ESE
+    # producto desde la tabla inventario". Si un slot está vacío
+    # (producto NULL), simplemente no aparece en el resultado — es
+    # justo el filtro que hace que la tienda no muestre nada sin asignar.
+    filas = conn.execute("""
+        SELECT inventario.producto, inventario.precio, inventario.stock, slots.id AS slot
+        FROM slots
+        JOIN inventario ON slots.producto = inventario.producto
+        WHERE slots.producto IS NOT NULL
+        ORDER BY slots.id
+    """).fetchall()
+    conn.close()
+    return {fila["producto"]: dict(fila) for fila in filas}

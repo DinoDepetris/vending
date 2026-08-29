@@ -12,6 +12,7 @@ from flask import Flask
 
 from config import SECRET_KEY
 from datos.inventario import inicializar_base_de_datos
+from datos.slots import inicializar_tabla_slots
 from datos.ventas import inicializar_tabla_ventas
 from rutas.cliente import cliente_bp
 from rutas.admin import admin_bp
@@ -40,5 +41,15 @@ app = crear_app()
 
 if __name__ == "__main__":
     inicializar_base_de_datos()
+
+    # Arrancamos con 5 slots físicos, y de entrada asignamos los tres
+    # productos de ejemplo a los primeros tres (dejando el 4 y el 5
+    # vacíos a propósito) — así, apenas corras esto, vas a ver en la
+    # tienda solo 3 botones, no 5, confirmando que el filtro funciona.
+    inicializar_tabla_slots(
+        cantidad_inicial=5,
+        productos_iniciales=["coca_500", "agua_500", "papas_150"]
+    )
+
     inicializar_tabla_ventas()
     app.run(debug=True, host="0.0.0.0", port=5000)

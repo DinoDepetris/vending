@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestión de slots</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body class="panel-admin">
+    <h2>Gestión de slots</h2>
+
+    <table>
+        <tr><th>Slot</th><th>Producto</th><th>Acción</th></tr>
+        {% for slot in slots %}
+        <tr>
+            <td>{{ slot.id }}</td>
+            {% if slot.producto %}
+                <td>{{ slot.producto }}</td>
+                <td>
+                    <form method="POST" action="/admin/slots/vaciar">
+                        <input type="hidden" name="slot_id" value="{{ slot.id }}">
+                        <button type="submit">Vaciar</button>
+                    </form>
+                </td>
+            {% else %}
+                <td><em>vacío</em></td>
+                <td>
+                    <form method="POST" action="/admin/slots/asignar" class="form-slot">
+                        <input type="hidden" name="slot_id" value="{{ slot.id }}">
+                        <input type="text" name="producto" placeholder="nombre" required>
+                        <input type="number" name="precio" placeholder="precio" required>
+                        <input type="number" name="stock" placeholder="stock" required>
+                        <button type="submit">Asignar</button>
+                    </form>
+                </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <form method="POST" action="/admin/slots/agregar" style="margin-top: 20px;">
+        <input type="number" name="cantidad" value="5" min="1" style="width: 60px;">
+        <button type="submit">Agregar slots nuevos</button>
+    </form>
+
+    <p style="margin-top: 24px;">
+        <a href="/admin">Volver al panel</a>
+        &nbsp;·&nbsp;
+        <a href="/admin/logout">Cerrar sesión</a>
+    </p>
+</body>
+</html>

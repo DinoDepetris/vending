@@ -8,7 +8,8 @@ from flask import Blueprint, render_template, request, session, redirect, Respon
 import csv
 import io
 
-from datos.inventario import obtener_inventario_completo, reponer_stock
+from datos.inventario import obtener_inventario_completo, reponer_stock, crear_o_actualizar_producto
+from datos.slots import obtener_todos_los_slots, asignar_producto_a_slot, vaciar_slot, agregar_slots_nuevos
 from datos.ventas import obtener_resumen_por_producto, obtener_total_general, obtener_ventas_recientes, obtener_todas_las_ventas
 from config import CONTRASEÑA_ADMIN
 
@@ -112,3 +113,56 @@ def exportar_ventas():
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=ventas.csv"}
     )
+
+
+@admin_bp.route("/slots")
+def panel_slots():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    slots = obtener_todos_los_slots()
+    return render_template("admin_slots.html", slots=slots)
+
+
+@admin_bp.route("/slots/asignar", methods=["POST"])
+def slots_asignar():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    slot_id = int(request.form.get("slot_id"))
+    producto = request.form.get("producto")
+    precio = int(request.form.get("precio", 0))
+    stock = int(request.form.get("stock", 0))
+
+    # crear_o_actualizar_producto es el "upsert" que vimos: si el nombre
+    # ya existe en el catálogo (por ejemplo, reasignás "coca_500" a otro
+    # slot), actualiza su precio/stock; si es un nombre nuevo, lo crea.
+    # Así, un solo formulario cubre tanto "poner un producto que ya
+    # tenía" como "dar de alta uno completamente nuevo".
+    crear_o_actualizar_producto(producto, precio, stock)
+    asignar_producto_a_slot(slot_id, producto)
+
+    return redirect("/admin/slots")
+
+
+@admin_bp.route("/slots/vaciar", methods=["POST"])
+def slots_vaciar():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    slot_id = int(request.form.get("slot_id"))
+    vaciar_slot(slot_id)
+
+    return redirect("/admin/slots")
+
+
+@admin_bp.route("/slots/agregar", methods=["POST"])
+def slots_agregar():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    cantidad = int(request.form.get("cantidad", 0))
+    if cantidad > 0:
+        agregar_slots_nuevos(cantidad)
+
+    return redirect("/admin/slots")
