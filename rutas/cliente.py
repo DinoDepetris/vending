@@ -233,6 +233,32 @@ def carrito_pagar():
     return render_template("confirmacion.html", entregas=entregas, fallidos=fallidos)
 
 
+# ---------------------------------------------------------------------------
+# BOTÓN TEMPORAL DE PRUEBA — sacar antes de producción
+# ---------------------------------------------------------------------------
+# Este camino existe solo para poder seguir probando el resto del sistema
+# (entrega, stock, ventas, alertas) mientras el sandbox de MercadoPago
+# anda fallando. A diferencia del camino simulado normal (que igual
+# depende de un "dado" al azar, para poder ver el caso de rechazo), este
+# aprueba SIEMPRE, sin excepción — para no perder tiempo reintentando
+# si te toca el 15% de rechazo justo cuando querés probar otra cosa.
+@cliente_bp.route("/carrito/pagar-simulado", methods=["POST"])
+def carrito_pagar_simulado():
+    carrito = _obtener_carrito()
+
+    if not carrito:
+        return redirect(url_for("cliente.ver_carrito"))
+
+    detalles, monto_total, redireccion_si_error = _validar_carrito(carrito)
+    if redireccion_si_error:
+        return redireccion_si_error
+
+    entregas, fallidos = _entregar_carrito(detalles)
+    session["carrito"] = {}
+
+    return render_template("confirmacion.html", entregas=entregas, fallidos=fallidos)
+
+
 @cliente_bp.route("/carrito/estado-pago")
 def estado_pago():
     pago_pendiente = session.get("pago_pendiente")

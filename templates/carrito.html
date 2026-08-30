@@ -28,7 +28,16 @@
         <p style="margin-top: 16px;"><strong>Total: ${{ resumen.total }}</strong></p>
 
         <form method="POST" action="/carrito/pagar">
-            <button type="submit">Pagar</button>
+            <button type="submit">Pagar con MercadoPago</button>
+        </form>
+
+        <!-- Botón temporal, solo para seguir probando el sistema mientras
+             el sandbox de MercadoPago anda fallando — sacar cuando ya no
+             haga falta. -->
+        <form method="POST" action="/carrito/pagar-simulado" style="margin-top: 6px;">
+            <button type="submit" style="background: #fff3cd; border-color: #ffc107;">
+                ⚠️ Pago ya aprobado (solo pruebas)
+            </button>
         </form>
     {% else %}
         <p>Tu carrito está vacío.</p>
