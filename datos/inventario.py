@@ -41,6 +41,21 @@ def inicializar_base_de_datos():
         )
         conn.commit()
 
+    # --- MIGRACIÓN: agregar la columna alerta_enviada si no existe ------
+    # A diferencia de otros cambios de estructura que hicimos antes (que
+    # te pedían borrar vending.db y arrancar de cero), esta vez usamos
+    # una técnica distinta: intentamos agregar la columna nueva, y si ya
+    # existe (porque ya corriste esta versión antes), SQLite tira un
+    # error que simplemente ignoramos. Así, tu base de datos existente
+    # se actualiza sola, sin perder nada de lo que ya tenías.
+    try:
+        conn.execute("ALTER TABLE inventario ADD COLUMN alerta_enviada INTEGER DEFAULT 0")
+        conn.commit()
+    except sqlite3.OperationalError:
+        # "duplicate column name" — significa que esto ya se había
+        # corrido antes en esta base de datos. No hay nada que hacer.
+        pass
+
     conn.close()
 
 
@@ -90,6 +105,24 @@ def reponer_stock(producto, cantidad):
     conn.execute(
         "UPDATE inventario SET stock = stock + ? WHERE producto = ?",
         (cantidad, producto)
+    )
+
+    # Al reponer, asumimos que el stock ya volvió a un nivel razonable
+    # — reseteamos la marca de "alerta ya enviada", para que si vuelve a
+    # bajar del umbral más adelante, te vuelva a avisar. Sin este
+    # reset, una vez mandada la primera alerta nunca más te avisaría
+    # de nada para ese producto.
+    conn.execute(
+        "UPDATE inventario SET alerta_enviada = 0 WHERE producto = ?", (producto,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def marcar_alerta_enviada(producto):
+    conn = obtener_conexion()
+    conn.execute(
+        "UPDATE inventario SET alerta_enviada = 1 WHERE producto = ?", (producto,)
     )
     conn.commit()
     conn.close()

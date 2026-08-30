@@ -9,6 +9,26 @@
 
     <p><strong>{{ total.cantidad }}</strong> ventas totales — <strong>${{ total.total }}</strong> facturados</p>
 
+    <h3>Por período</h3>
+    <table>
+        <tr><th>Período</th><th>Ventas</th><th>Facturado</th></tr>
+        <tr>
+            <td>Hoy</td>
+            <td>{{ total_hoy.cantidad }}</td>
+            <td>${{ total_hoy.total }}</td>
+        </tr>
+        <tr>
+            <td>Últimos 7 días</td>
+            <td>{{ total_semana.cantidad }}</td>
+            <td>${{ total_semana.total }}</td>
+        </tr>
+        <tr>
+            <td>Últimos 30 días</td>
+            <td>{{ total_mes.cantidad }}</td>
+            <td>${{ total_mes.total }}</td>
+        </tr>
+    </table>
+
     <h3>Por producto</h3>
     <table>
         <tr><th>Producto</th><th>Cantidad</th><th>Total</th></tr>

@@ -22,3 +22,27 @@ CONTRASEÑA_ADMIN = "reponer123"
 
 # Nombre del archivo donde vive la base de datos SQLite.
 DB_PATH = "vending.db"
+
+# Cuando el stock de un producto llega a este número o menos, se
+# dispara la alerta de stock bajo.
+UMBRAL_STOCK_BAJO = 2
+
+# Las credenciales de email son datos sensibles de verdad — mucho más
+# que la contraseña del panel de admin — así que viven en un archivo
+# APARTE, config_secretos.py, que está en el .gitignore y nunca se sube
+# a Git. Si ese archivo todavía no existe (por ejemplo, en una compu
+# nueva donde no lo creaste todavía), el except de abajo deja las
+# alertas por email simplemente desactivadas, sin romper nada del
+# resto del sistema.
+try:
+    from config_secretos import (
+        EMAIL_HABILITADO, EMAIL_REMITENTE, EMAIL_PASSWORD,
+        EMAIL_DESTINATARIO, EMAIL_SMTP_HOST, EMAIL_SMTP_PORT
+    )
+except ImportError:
+    EMAIL_HABILITADO = False
+    EMAIL_REMITENTE = None
+    EMAIL_PASSWORD = None
+    EMAIL_DESTINATARIO = None
+    EMAIL_SMTP_HOST = "smtp.gmail.com"
+    EMAIL_SMTP_PORT = 587

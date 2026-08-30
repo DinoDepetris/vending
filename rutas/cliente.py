@@ -10,10 +10,12 @@ guardados del lado del servidor asociados a esa cookie.
 
 from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for
 
-from datos.inventario import obtener_productos_en_venta, obtener_producto, descontar_stock
+from datos.inventario import obtener_productos_en_venta, obtener_producto, descontar_stock, marcar_alerta_enviada
 from datos.slots import obtener_slot_por_producto
 from datos.ventas import registrar_venta
 from simuladores import arduino, autorizar_pago_en_servidor
+from notificaciones import enviar_alerta_stock_bajo
+from config import UMBRAL_STOCK_BAJO
 
 cliente_bp = Blueprint("cliente", __name__)
 
@@ -203,6 +205,17 @@ def carrito_pagar():
                 descontar_stock(detalle["producto"])
                 registrar_venta(detalle["producto"], detalle["precio"])
                 entregados_de_este += 1
+
+                # Después de descontar, miramos cómo quedó el stock. Si
+                # ya está en el umbral o por debajo, y todavía no le
+                # mandamos la alerta a este producto (para no
+                # mandársela de nuevo en cada venta siguiente), la
+                # disparamos ahora.
+                producto_actualizado = obtener_producto(detalle["producto"])
+                if (producto_actualizado["stock"] <= UMBRAL_STOCK_BAJO
+                        and not producto_actualizado["alerta_enviada"]):
+                    enviar_alerta_stock_bajo(detalle["producto"], producto_actualizado["stock"])
+                    marcar_alerta_enviada(detalle["producto"])
             else:
                 productos_fallidos.append(detalle["producto"])
 

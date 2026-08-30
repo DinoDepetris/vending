@@ -10,7 +10,10 @@ import io
 
 from datos.inventario import obtener_productos_en_venta, reponer_stock, retirar_stock, crear_o_actualizar_producto
 from datos.slots import obtener_todos_los_slots, asignar_producto_a_slot, vaciar_slot, agregar_slots_nuevos
-from datos.ventas import obtener_resumen_por_producto, obtener_total_general, obtener_ventas_recientes, obtener_todas_las_ventas
+from datos.ventas import (
+    obtener_resumen_por_producto, obtener_total_general, obtener_ventas_recientes,
+    obtener_todas_las_ventas, obtener_total_hoy, obtener_total_semana, obtener_total_mes
+)
 from config import CONTRASEÑA_ADMIN
 
 admin_bp = Blueprint("admin", __name__)
@@ -99,7 +102,10 @@ def panel_ventas():
         "admin_ventas.html",
         resumen=resumen,
         total=total,
-        recientes=recientes
+        recientes=recientes,
+        total_hoy=obtener_total_hoy(),
+        total_semana=obtener_total_semana(),
+        total_mes=obtener_total_mes()
     )
 
 

@@ -10,7 +10,7 @@ por eso necesitan vivir en tablas, y hasta en archivos, separados.
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from config import DB_PATH
 
@@ -93,14 +93,42 @@ def obtener_resumen_por_producto():
 
 def obtener_total_general():
     conn = obtener_conexion()
-
-    # COALESCE(SUM(precio), 0): si todavía no hubo NINGUNA venta,
-    # SUM(precio) da NULL en vez de 0 (así funciona SQL cuando no hay
-    # filas para sumar). COALESCE dice "si esto es NULL, usá este otro
-    # valor en su lugar" — así el resumen muestra "$0" prolijamente en
-    # vez de romper o mostrar "None".
     fila = conn.execute(
         "SELECT COUNT(*) as cantidad, COALESCE(SUM(precio), 0) as total FROM ventas"
     ).fetchone()
     conn.close()
     return dict(fila)
+
+
+def _resumen_desde(fecha_desde_iso):
+    # Función interna (el guion bajo adelante es una convención de
+    # Python para decir "esto es un detalle interno de este archivo, no
+    # lo uses desde afuera") — las tres funciones de abajo la reusan,
+    # cada una calculando un punto de partida distinto.
+    conn = obtener_conexion()
+    fila = conn.execute(
+        "SELECT COUNT(*) as cantidad, COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha_hora >= ?",
+        (fecha_desde_iso,)
+    ).fetchone()
+    conn.close()
+    return dict(fila)
+
+
+def obtener_total_hoy():
+    # strftime da la fecha de hoy sin la hora (ej: "2026-08-30"), y le
+    # agregamos "T00:00:00" para comparar contra el mismo formato que
+    # usa fecha_hora en la tabla. Cualquier venta de hoy, sea a la
+    # medianoche o a las 23:59, va a ser "mayor o igual" a ese punto de
+    # arranque del día.
+    inicio_de_hoy = datetime.now().strftime("%Y-%m-%dT00:00:00")
+    return _resumen_desde(inicio_de_hoy)
+
+
+def obtener_total_semana():
+    hace_7_dias = (datetime.now() - timedelta(days=7)).isoformat()
+    return _resumen_desde(hace_7_dias)
+
+
+def obtener_total_mes():
+    hace_30_dias = (datetime.now() - timedelta(days=30)).isoformat()
+    return _resumen_desde(hace_30_dias)
