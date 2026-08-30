@@ -28,6 +28,14 @@
                         <input type="text" name="producto" placeholder="nombre" required>
                         <input type="number" name="precio" placeholder="precio" required>
                         <input type="number" name="stock" placeholder="stock" required>
+                        <select name="categoria_id">
+                            <option value="">Sin categoría</option>
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}">
+                                {{ ("&nbsp;&nbsp;" * categoria.nivel) | safe }}{{ categoria.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
                         <button type="submit">Asignar</button>
                     </form>
                 </td>

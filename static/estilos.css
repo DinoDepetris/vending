@@ -66,6 +66,16 @@ th {
     width: 70px;
 }
 
+/* Los formularios de editar/eliminar categoría van en línea, uno al
+   lado del otro — igual razón que con el botón del carrito: sin esto
+   heredarían el "width: 100%" del estilo general de <button>. */
+#lista-categorias button,
+#lista-categorias form {
+    width: auto;
+    display: inline-flex;
+    margin: 0;
+}
+
 /* --- Carrito y lista de productos con cantidad --- */
 
 .header {

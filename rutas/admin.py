@@ -4,7 +4,7 @@ sesión. Todo lo que tiene que ver con la contraseña y la sesión vive
 acá, separado por completo de las rutas del cliente.
 """
 
-from flask import Blueprint, render_template, request, session, redirect, Response
+from flask import Blueprint, render_template, request, session, redirect, Response, url_for
 import csv
 import io
 
@@ -13,6 +13,10 @@ from datos.slots import obtener_todos_los_slots, asignar_producto_a_slot, vaciar
 from datos.ventas import (
     obtener_resumen_por_producto, obtener_total_general, obtener_ventas_recientes,
     obtener_todas_las_ventas, obtener_total_hoy, obtener_total_semana, obtener_total_mes
+)
+from datos.categorias import (
+    obtener_categorias_ordenadas, crear_categoria, contar_subcategorias,
+    eliminar_categoria, renombrar_categoria
 )
 from config import CONTRASEÑA_ADMIN
 
@@ -148,7 +152,8 @@ def panel_slots():
         return redirect("/admin")
 
     slots = obtener_todos_los_slots()
-    return render_template("admin_slots.html", slots=slots)
+    categorias = obtener_categorias_ordenadas()
+    return render_template("admin_slots.html", slots=slots, categorias=categorias)
 
 
 @admin_bp.route("/slots/asignar", methods=["POST"])
@@ -161,12 +166,15 @@ def slots_asignar():
     precio = int(request.form.get("precio", 0))
     stock = int(request.form.get("stock", 0))
 
-    # crear_o_actualizar_producto es el "upsert" que vimos: si el nombre
-    # ya existe en el catálogo (por ejemplo, reasignás "coca_500" a otro
-    # slot), actualiza su precio/stock; si es un nombre nuevo, lo crea.
-    # Así, un solo formulario cubre tanto "poner un producto que ya
-    # tenía" como "dar de alta uno completamente nuevo".
-    crear_o_actualizar_producto(producto, precio, stock)
+    # El desplegable manda un string vacío si elegiste "Sin categoría"
+    # (o directamente no lo tocaste). "" or None da None — así queda
+    # guardado como "sin categoría asignada" en vez de un string vacío
+    # sin sentido en la base de datos.
+    categoria_id = request.form.get("categoria_id") or None
+    if categoria_id:
+        categoria_id = int(categoria_id)
+
+    crear_o_actualizar_producto(producto, precio, stock, categoria_id)
     asignar_producto_a_slot(slot_id, producto)
 
     return redirect("/admin/slots")
@@ -193,3 +201,64 @@ def slots_agregar():
         agregar_slots_nuevos(cantidad)
 
     return redirect("/admin/slots")
+
+
+@admin_bp.route("/categorias")
+def panel_categorias():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    categorias = obtener_categorias_ordenadas()
+    mensaje = request.args.get("mensaje")
+    return render_template("admin_categorias.html", categorias=categorias, mensaje=mensaje)
+
+
+@admin_bp.route("/categorias/crear", methods=["POST"])
+def categorias_crear():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    nombre = request.form.get("nombre")
+    categoria_padre_id = request.form.get("categoria_padre_id") or None
+    if categoria_padre_id:
+        categoria_padre_id = int(categoria_padre_id)
+
+    if nombre:
+        crear_categoria(nombre, categoria_padre_id)
+
+    return redirect("/admin/categorias")
+
+
+@admin_bp.route("/categorias/editar", methods=["POST"])
+def categorias_editar():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    categoria_id = int(request.form.get("categoria_id"))
+    nuevo_nombre = request.form.get("nuevo_nombre")
+
+    if nuevo_nombre:
+        renombrar_categoria(categoria_id, nuevo_nombre)
+
+    return redirect("/admin/categorias")
+
+
+@admin_bp.route("/categorias/eliminar", methods=["POST"])
+def categorias_eliminar():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    categoria_id = int(request.form.get("categoria_id"))
+
+    # Esta es la protección clave: si la categoría tiene subcategorías
+    # colgando de ella, no la dejamos eliminar sin más — quedarían esas
+    # subcategorías "huérfanas" apuntando a un padre que ya no existe.
+    # Le pedimos al admin que las borre o reasigne primero, a propósito.
+    if contar_subcategorias(categoria_id) > 0:
+        return redirect(url_for(
+            "admin.panel_categorias",
+            mensaje="Esta categoría tiene subcategorías. Eliminalas o movelas primero."
+        ))
+
+    eliminar_categoria(categoria_id)
+    return redirect("/admin/categorias")

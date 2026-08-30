@@ -56,6 +56,14 @@ def inicializar_base_de_datos():
         # corrido antes en esta base de datos. No hay nada que hacer.
         pass
 
+    # Misma técnica para la columna de categoría: se agrega sola, sin
+    # perder nada de lo que ya tenías guardado.
+    try:
+        conn.execute("ALTER TABLE inventario ADD COLUMN categoria_id INTEGER")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     conn.close()
 
 
@@ -75,18 +83,20 @@ def obtener_producto(producto):
     return dict(fila) if fila else None
 
 
-def crear_o_actualizar_producto(producto, precio, stock):
+def crear_o_actualizar_producto(producto, precio, stock, categoria_id=None):
     conn = obtener_conexion()
 
-    # Esto se llama "upsert" (update + insert): si el producto ya existe
-    # (mismo nombre), actualiza su precio y stock; si no existe, lo crea.
-    # ON CONFLICT detecta el choque contra la clave primaria (producto)
-    # y decide qué hacer en ese caso, en una sola consulta.
+    # Mismo "upsert" que antes, ahora con una columna más. categoria_id
+    # puede ser None (sin categoría asignada) perfectamente — no es
+    # obligatorio elegir una.
     conn.execute("""
-        INSERT INTO inventario (producto, precio, stock)
-        VALUES (?, ?, ?)
-        ON CONFLICT(producto) DO UPDATE SET precio = excluded.precio, stock = excluded.stock
-    """, (producto, precio, stock))
+        INSERT INTO inventario (producto, precio, stock, categoria_id)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(producto) DO UPDATE SET
+            precio = excluded.precio,
+            stock = excluded.stock,
+            categoria_id = excluded.categoria_id
+    """, (producto, precio, stock, categoria_id))
     conn.commit()
     conn.close()
 

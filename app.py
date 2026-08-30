@@ -14,6 +14,7 @@ from config import SECRET_KEY
 from datos.inventario import inicializar_base_de_datos
 from datos.slots import inicializar_tabla_slots
 from datos.ventas import inicializar_tabla_ventas
+from datos.categorias import inicializar_tabla_categorias
 from rutas.cliente import cliente_bp
 from rutas.admin import admin_bp
 
@@ -52,4 +53,5 @@ if __name__ == "__main__":
     )
 
     inicializar_tabla_ventas()
+    inicializar_tabla_categorias()
     app.run(debug=True, host="0.0.0.0", port=5000)

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Categorías</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body class="panel-admin">
+    <h2>Categorías</h2>
+
+    {% if mensaje %}
+        <p style="color: #b00020;">{{ mensaje }}</p>
+    {% endif %}
+
+    {% if categorias %}
+        <ul id="lista-categorias" style="list-style: none; padding: 0;">
+            {% for categoria in categorias %}
+            <li style="margin-left: {{ categoria.nivel * 20 }}px; padding: 4px 0; display: flex; align-items: center; gap: 6px;">
+                <form method="POST" action="/admin/categorias/editar" style="display: flex; gap: 4px;">
+                    <input type="hidden" name="categoria_id" value="{{ categoria.id }}">
+                    <input type="text" name="nuevo_nombre" value="{{ categoria.nombre }}" style="width: 140px;">
+                    <button type="submit">Guardar</button>
+                </form>
+                <form method="POST" action="/admin/categorias/eliminar">
+                    <input type="hidden" name="categoria_id" value="{{ categoria.id }}">
+                    <button type="submit">Eliminar</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Todavía no creaste ninguna categoría.</p>
+    {% endif %}
+
+    <h3>Crear categoría</h3>
+    <form method="POST" action="/admin/categorias/crear">
+        <input type="text" name="nombre" placeholder="Nombre (ej: Gaseosas)" required style="width: 100%; margin-bottom: 8px;">
+
+        <select name="categoria_padre_id" style="width: 100%; margin-bottom: 8px;">
+            <option value="">(categoría raíz, sin padre)</option>
+            {% for categoria in categorias %}
+            <option value="{{ categoria.id }}">
+                {{ ("&nbsp;&nbsp;" * categoria.nivel) | safe }}{{ categoria.nombre }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">Crear</button>
+    </form>
+
+    <p><a href="/admin">Volver al panel</a></p>
+</body>
+</html>
