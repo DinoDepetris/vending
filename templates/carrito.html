@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tu carrito</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+    <h2>Tu carrito</h2>
+
+    {% if resumen.lineas %}
+        <table>
+            <tr><th>Producto</th><th>Cant.</th><th>Subtotal</th><th></th></tr>
+            {% for linea in resumen.lineas %}
+            <tr>
+                <td>{{ linea.producto }}</td>
+                <td>{{ linea.cantidad }}</td>
+                <td>${{ linea.subtotal }}</td>
+                <td>
+                    <form method="POST" action="/carrito/quitar-form">
+                        <input type="hidden" name="producto" value="{{ linea.producto }}">
+                        <button type="submit">Quitar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <p style="margin-top: 16px;"><strong>Total: ${{ resumen.total }}</strong></p>
+
+        <form method="POST" action="/carrito/pagar">
+            <button type="submit">Pagar</button>
+        </form>
+    {% else %}
+        <p>Tu carrito está vacío.</p>
+    {% endif %}
+
+    <p><a href="/">Volver a la tienda</a></p>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Confirmación</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+    {% if entregas %}
+        <h2>¡Pago aceptado!</h2>
+        <p>Retirá:</p>
+        <ul>
+            {% for entrega in entregas %}
+            <li>{{ entrega.producto }} x{{ entrega.cantidad }} — puerta {{ entrega.slot }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <h2>No se pudo entregar ningún producto</h2>
+    {% endif %}
+
+    {% if fallidos %}
+        <p style="color: #b00020;">
+            Hubo un problema entregando: {{ fallidos | join(", ") }}. Contactá soporte.
+        </p>
+    {% endif %}
+
+    <p>Volviendo a la tienda en <span id="segundos">5</span> segundos...</p>
+    <p><a href="/">Volver ahora</a></p>
+
+    <script>
+        // Un contador simple: cada 1000ms (1 segundo) resta uno, y
+        // cuando llega a 0 redirige sola a la tienda. clearInterval
+        // corta el conteo para que no siga descontando de más una vez
+        // que ya nos fuimos de esta página.
+        let segundos = 5;
+        const span = document.getElementById("segundos");
+
+        const intervalo = setInterval(() => {
+            segundos -= 1;
+            span.innerText = segundos;
+
+            if (segundos <= 0) {
+                clearInterval(intervalo);
+                window.location.href = "/";
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

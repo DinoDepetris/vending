@@ -7,9 +7,16 @@
 <body>
     <div class="header">
         <h2>Elegí tus productos</h2>
-        <button id="btn-carrito" onclick="alternarCarrito()">
-            🛒 <span id="contador-carrito">0</span>
-        </button>
+        <div class="carrito-wrapper">
+            <button id="btn-carrito" onclick="alternarPreview()">
+                🛒 <span id="contador-carrito">{{ resumen.cantidad_total }}</span>
+            </button>
+            <div id="carrito-preview" class="oculto">
+                <div id="preview-items"></div>
+                <p>Total: $<span id="preview-total">{{ resumen.total }}</span></p>
+                <a href="/carrito" class="btn-like">Ir al carrito</a>
+            </div>
+        </div>
     </div>
 
     <div id="lista-productos">
@@ -32,120 +39,74 @@
         {% endfor %}
     </div>
 
-    <div id="carrito-panel" class="oculto">
-        <h3>Tu carrito</h3>
-        <div id="carrito-items"></div>
-        <p>Total: $<span id="carrito-total">0</span></p>
-        <button onclick="pagarCarrito()">Pagar</button>
-        <button onclick="alternarCarrito()">Cerrar</button>
-    </div>
-
-    <div id="resultado">Esperando tu selección...</div>
+    <div id="resultado">{{ mensaje_inicial }}</div>
 
     <script>
-        // productosInfo guarda el precio y el stock más reciente de cada
-        // producto, del lado del navegador. Arranca con lo que vino en
-        // la página, y se va actualizando solo con cada tick del
-        // polling — el carrito lo usa para calcular subtotales sin
-        // tener que preguntarle al servidor cada vez que tocás algo.
-        let productosInfo = {
-            {% for nombre, datos in inventario.items() %}
-            "{{ nombre }}": {precio: {{ datos.precio }}, stock: {{ datos.stock }}},
-            {% endfor %}
+        // Arrancamos con lo que ya había en el carrito guardado en la
+        // sesión del servidor (por si volviste a la tienda con algo
+        // adentro), y desde acá en más lo mantenemos actualizado con
+        // cada respuesta que nos manda el servidor.
+        let carritoActual = {
+            lineas: [
+                {% for linea in resumen.lineas %}
+                {producto: "{{ linea.producto }}", cantidad: {{ linea.cantidad }}, subtotal: {{ linea.subtotal }}},
+                {% endfor %}
+            ],
+            total: {{ resumen.total }},
+            cantidad_total: {{ resumen.cantidad_total }}
         };
 
-        // El carrito en sí: un objeto donde cada clave es un nombre de
-        // producto y el valor es cuántas unidades pediste de él. Vive
-        // solo en la memoria de ESTA pestaña del navegador — si
-        // recargás la página, se vacía (para guardarlo entre recargas
-        // haría falta otra técnica, que no necesitamos por ahora).
-        let carrito = {};
+        function renderizarPreview() {
+            const contenedor = document.getElementById("preview-items");
+            contenedor.innerHTML = "";
 
-        function agregarAlCarrito(producto) {
+            for (const linea of carritoActual.lineas) {
+                const fila = document.createElement("div");
+                fila.className = "carrito-linea";
+                fila.innerHTML = `
+                    <span>${linea.producto} x${linea.cantidad} — $${linea.subtotal}</span>
+                    <button onclick="quitarDelCarrito('${linea.producto}')">Quitar</button>
+                `;
+                contenedor.appendChild(fila);
+            }
+
+            document.getElementById("preview-total").innerText = carritoActual.total;
+            document.getElementById("contador-carrito").innerText = carritoActual.cantidad_total;
+        }
+
+        async function agregarAlCarrito(producto) {
             const input = document.getElementById("cantidad-" + producto);
             const cantidad = parseInt(input.value) || 0;
 
             if (cantidad <= 0) return;
 
-            // Si ya tenías algo de este producto en el carrito, sumamos
-            // a lo que ya había; si es la primera vez, arranca de cero.
-            carrito[producto] = (carrito[producto] || 0) + cantidad;
-
-            actualizarCarritoUI();
-        }
-
-        function quitarDelCarrito(producto) {
-            delete carrito[producto];
-            actualizarCarritoUI();
-        }
-
-        function actualizarCarritoUI() {
-            const contenedor = document.getElementById("carrito-items");
-            contenedor.innerHTML = "";
-
-            let total = 0;
-            let cantidadTotal = 0;
-
-            for (const producto in carrito) {
-                const cantidad = carrito[producto];
-                const precio = productosInfo[producto] ? productosInfo[producto].precio : 0;
-                const subtotal = precio * cantidad;
-
-                total += subtotal;
-                cantidadTotal += cantidad;
-
-                const linea = document.createElement("div");
-                linea.className = "carrito-linea";
-                linea.innerHTML = `
-                    <span>${producto} x${cantidad} — $${subtotal}</span>
-                    <button onclick="quitarDelCarrito('${producto}')">Quitar</button>
-                `;
-                contenedor.appendChild(linea);
-            }
-
-            document.getElementById("carrito-total").innerText = total;
-            document.getElementById("contador-carrito").innerText = cantidadTotal;
-        }
-
-        function alternarCarrito() {
-            document.getElementById("carrito-panel").classList.toggle("oculto");
-        }
-
-        async function pagarCarrito() {
-            // Object.keys(carrito).map(...) convierte el objeto
-            // {coca_500: 2, agua_500: 1} en la lista de items que el
-            // servidor espera: [{producto: "coca_500", cantidad: 2}, ...]
-            const items = Object.keys(carrito).map(producto => ({
-                producto: producto,
-                cantidad: carrito[producto]
-            }));
-
-            if (items.length === 0) {
-                document.getElementById("resultado").innerText = "El carrito está vacío";
-                return;
-            }
-
-            document.getElementById("resultado").innerText = "Procesando pago...";
-
-            const respuesta = await fetch("/pedido", {
+            // A diferencia de la versión anterior, ahora esto le avisa
+            // al SERVIDOR (no solo actualiza una variable local) —
+            // porque el carrito tiene que sobrevivir aunque navegues a
+            // /carrito, que es una página distinta.
+            const respuesta = await fetch("/carrito/agregar", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({items: items})
+                body: JSON.stringify({producto: producto, cantidad: cantidad})
             });
 
-            const datos = await respuesta.json();
-            document.getElementById("resultado").innerText = datos.mensaje;
+            carritoActual = await respuesta.json();
+            renderizarPreview();
+        }
 
-            // Vaciamos el carrito y lo cerramos, haya salido bien del
-            // todo o a medias — el mensaje ya cuenta qué se entregó y
-            // qué no, y dejar un carrito a medio pagar sería confuso.
-            carrito = {};
-            actualizarCarritoUI();
-            document.getElementById("carrito-panel").classList.add("oculto");
+        async function quitarDelCarrito(producto) {
+            const respuesta = await fetch("/carrito/quitar", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({producto: producto})
+            });
 
-            // No esperamos al próximo tick del polling para mostrar el
-            // stock actualizado — lo pedimos ya mismo.
-            actualizarBotones();
+            carritoActual = await respuesta.json();
+            renderizarPreview();
+        }
+
+        function alternarPreview() {
+            document.getElementById("carrito-preview").classList.toggle("oculto");
         }
 
         async function actualizarBotones() {
@@ -154,7 +115,6 @@
 
             for (const nombre in inventario) {
                 const datos = inventario[nombre];
-                productosInfo[nombre] = {precio: datos.precio, stock: datos.stock};
 
                 const stockSpan = document.getElementById("stock-" + nombre);
                 const input = document.getElementById("cantidad-" + nombre);
@@ -164,10 +124,6 @@
                 if (input) input.max = datos.stock;
                 if (boton) boton.disabled = datos.stock <= 0;
             }
-
-            // Si el precio de algo cambió, el total del carrito también
-            // debería reflejarlo — lo recalculamos con los datos frescos.
-            actualizarCarritoUI();
         }
 
         setInterval(actualizarBotones, 2000);
