@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, request, session, redirect, Respon
 import csv
 import io
 
-from datos.inventario import obtener_inventario_completo, reponer_stock, crear_o_actualizar_producto
+from datos.inventario import obtener_productos_en_venta, reponer_stock, retirar_stock, crear_o_actualizar_producto
 from datos.slots import obtener_todos_los_slots, asignar_producto_a_slot, vaciar_slot, agregar_slots_nuevos
 from datos.ventas import obtener_resumen_por_producto, obtener_total_general, obtener_ventas_recientes, obtener_todas_las_ventas
 from config import CONTRASEÑA_ADMIN
@@ -26,7 +26,14 @@ def panel_admin():
     if not session.get("autenticado"):
         return render_template("admin_login.html")
 
-    inventario = obtener_inventario_completo()
+    # Cambio clave: antes usaba obtener_inventario_completo(), que trae
+    # TODO el catálogo exista o no en algún slot. Eso causaba el bug que
+    # reportaste — un producto recién vaciado de su slot seguía
+    # apareciendo acá para reponerle stock, aunque ya no estuviera a la
+    # venta en ningún lado. obtener_productos_en_venta() es la misma
+    # función que ya usa la tienda: solo trae lo que tiene slot asignado
+    # ahora mismo, así las dos pantallas quedan siempre consistentes.
+    inventario = obtener_productos_en_venta()
     return render_template("admin_panel.html", inventario=inventario)
 
 
@@ -61,6 +68,20 @@ def admin_reponer():
 
     if cantidad > 0:
         reponer_stock(producto, cantidad)
+
+    return redirect("/admin")
+
+
+@admin_bp.route("/retirar", methods=["POST"])
+def admin_retirar():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    producto = request.form.get("producto")
+    cantidad = int(request.form.get("cantidad", 0))
+
+    if cantidad > 0:
+        retirar_stock(producto, cantidad)
 
     return redirect("/admin")
 

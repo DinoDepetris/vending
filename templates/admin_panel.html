@@ -7,16 +7,23 @@
 <body class="panel-admin">
     <h2>Panel de reposición</h2>
     <table>
-        <tr><th>Producto</th><th>Stock</th><th>Reponer</th></tr>
+        <tr><th>Producto</th><th>Stock</th><th>Reponer</th><th>Retirar</th></tr>
         {% for nombre, datos in inventario.items() %}
         <tr>
             <td>{{ nombre }}</td>
-            <td>{{ datos.stock }}</td>
+            <td id="stock-{{ nombre }}">{{ datos.stock }}</td>
             <td>
                 <form method="POST" action="/admin/reponer" class="form-reponer">
                     <input type="hidden" name="producto" value="{{ nombre }}">
                     <input type="number" name="cantidad" value="10" min="1">
                     <button type="submit">Reponer</button>
+                </form>
+            </td>
+            <td>
+                <form method="POST" action="/admin/retirar" class="form-reponer">
+                    <input type="hidden" name="producto" value="{{ nombre }}">
+                    <input type="number" name="cantidad" value="1" min="1">
+                    <button type="submit">Retirar</button>
                 </form>
             </td>
         </tr>
@@ -25,5 +32,27 @@
     <p><a href="/admin/slots">Gestionar slots</a></p>
     <p><a href="/admin/ventas">Ver historial de ventas</a></p>
     <p><a href="/admin/logout">Cerrar sesión</a></p>
+
+    <script>
+        // El mismo patrón de polling que ya usa la tienda (tienda.html):
+        // le preguntamos al servidor cada 2 segundos "¿cómo está el
+        // stock ahora?", y actualizamos solo el número, sin recargar
+        // toda la página. Reutilizamos /estado — es la misma ruta que
+        // ya existía para la tienda, porque el dato que necesitamos acá
+        // es exactamente el mismo (producto → stock actual).
+        async function actualizarStock() {
+            const respuesta = await fetch("/estado");
+            const productos = await respuesta.json();
+
+            for (const nombre in productos) {
+                const celda = document.getElementById("stock-" + nombre);
+                if (celda) {
+                    celda.innerText = productos[nombre].stock;
+                }
+            }
+        }
+
+        setInterval(actualizarStock, 2000);
+    </script>
 </body>
 </html>

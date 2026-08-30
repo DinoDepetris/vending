@@ -95,6 +95,22 @@ def reponer_stock(producto, cantidad):
     conn.close()
 
 
+def retirar_stock(producto, cantidad):
+    conn = obtener_conexion()
+
+    # MAX(stock - ?, 0) calcula la resta y, si el resultado sería
+    # negativo, se queda en 0 en su lugar. Esto evita que un retiro más
+    # grande que el stock actual (por ejemplo, un typo: poner 500 en vez
+    # de 5) deje un número negativo guardado, que no tendría sentido
+    # para una cantidad de productos físicos.
+    conn.execute(
+        "UPDATE inventario SET stock = MAX(stock - ?, 0) WHERE producto = ?",
+        (cantidad, producto)
+    )
+    conn.commit()
+    conn.close()
+
+
 def obtener_productos_en_venta():
     conn = obtener_conexion()
 
