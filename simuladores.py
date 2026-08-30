@@ -15,9 +15,39 @@ import random
 
 
 class ArduinoSimulado:
+    def accionar_motor(self, slot):
+        # Este método representa SOLO la parte mecánica: girar el motor
+        # o mover el solenoide que empuja el producto. Puede fallar por
+        # causas eléctricas o mecánicas (falta de torque, engranaje
+        # trabado) — nada que el software pueda arreglar, solo detectar.
+        #
+        # Reintentamos hasta 2 veces, como haría un controlador real
+        # ante un motor que no giró del todo la primera vez.
+        for _ in range(2):
+            time.sleep(0.5)
+            if random.random() < 0.92:
+                return True
+        return False
+
+    def confirmar_entrega(self, slot):
+        # Este método representa el sensor (infrarrojo, de peso, o un
+        # microswitch) que confirma que el producto REALMENTE cayó —
+        # separado del motor a propósito. Un motor puede girar
+        # perfecto y aun así el producto quedar trabado a mitad de
+        # camino (el clásico caso del paquete que queda "colgado").
+        time.sleep(0.3)
+        return random.random() < 0.97
+
     def abrir_compuerta(self, slot):
-        time.sleep(1)
-        return random.random() < 0.9
+        # Esta sigue siendo la función que llama el resto del proyecto
+        # (rutas/cliente.py no cambia nada) — por dentro, ahora
+        # encadena los dos pasos reales: primero el motor, después el
+        # sensor. Si el motor ni siquiera pudo accionar, ni tiene
+        # sentido preguntarle al sensor.
+        if not self.accionar_motor(slot):
+            return False
+
+        return self.confirmar_entrega(slot)
 
 
 def autorizar_pago_en_servidor(monto):

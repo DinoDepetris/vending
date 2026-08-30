@@ -1,10 +1,10 @@
 """
 Rutas que usa el cliente que compra: la página principal, hacer un
-pedido, y consultar el estado del stock (para el polling automático).
+pedido (ahora un CARRITO con varios productos y cantidades, no uno
+solo), y consultar el estado del stock (para el polling automático).
 
 Estas rutas no saben nada de contraseñas ni de sesiones — ese tema es
-responsabilidad exclusiva de admin.py. Cada archivo de rutas se ocupa
-solo de "su" tipo de usuario.
+responsabilidad exclusiva de admin.py.
 """
 
 from flask import Blueprint, render_template, jsonify, request
@@ -19,11 +19,6 @@ cliente_bp = Blueprint("cliente", __name__)
 
 @cliente_bp.route("/")
 def pagina_principal():
-    # obtener_productos_en_venta() (no obtener_inventario_completo())
-    # es la clave de todo este cambio: solo trae productos que ESTÁN
-    # puestos en algún slot ahora mismo. Un producto que existe en el
-    # catálogo pero no está asignado a ninguna compuerta, simplemente no
-    # aparece acá — la tienda nunca se entera de que existe.
     productos = obtener_productos_en_venta()
     return render_template("tienda.html", inventario=productos)
 
@@ -35,39 +30,90 @@ def estado_actual():
 
 @cliente_bp.route("/pedido", methods=["POST"])
 def procesar_pedido_web():
+    # Ahora el cuerpo del pedido no es {"producto": "..."} sino
+    # {"items": [{"producto": "...", "cantidad": N}, ...]} — una lista,
+    # porque el carrito puede traer varios productos distintos a la vez.
     datos_pedido = request.get_json()
-    producto = datos_pedido.get("producto")
+    items = datos_pedido.get("items", [])
 
-    datos_producto = obtener_producto(producto)
+    if not items:
+        return jsonify({"ok": False, "mensaje": "El carrito está vacío"})
 
-    if datos_producto is None:
-        return jsonify({"ok": False, "mensaje": "Ese producto no existe"})
+    # --- PASO 1: validar TODO el carrito antes de cobrar un solo peso ---
+    # Recorremos cada línea del carrito y juntamos sus datos reales
+    # (precio, slot) desde la base de datos — nunca confiamos en el
+    # precio que pueda venir del navegador, solo en el nombre del
+    # producto y la cantidad pedida. Si cualquier línea falla, cortamos
+    # acá, antes de tocar el pago o el stock de nada.
+    detalles = []
+    monto_total = 0
 
-    # Este chequeo es nuevo y es justo el que evita el problema que
-    # charlamos: aunque alguien intente comprar un producto directamente
-    # (sin pasar por los botones de la tienda), si ese producto ya no
-    # tiene un slot asignado, la venta se rechaza acá — nunca se le
-    # cobra a nadie algo que no hay dónde entregar.
-    slot_id = obtener_slot_por_producto(producto)
-    if slot_id is None:
-        return jsonify({"ok": False, "mensaje": "Ese producto ya no está disponible"})
+    for item in items:
+        producto = item.get("producto")
+        cantidad = item.get("cantidad", 0)
 
-    if datos_producto["stock"] <= 0:
-        return jsonify({"ok": False, "mensaje": "Sin stock disponible"})
+        if cantidad <= 0:
+            continue
 
-    aprobado = autorizar_pago_en_servidor(datos_producto["precio"])
+        datos_producto = obtener_producto(producto)
+        if datos_producto is None:
+            return jsonify({"ok": False, "mensaje": f"'{producto}' no existe"})
+
+        slot_id = obtener_slot_por_producto(producto)
+        if slot_id is None:
+            return jsonify({"ok": False, "mensaje": f"'{producto}' ya no está disponible"})
+
+        if datos_producto["stock"] < cantidad:
+            return jsonify({
+                "ok": False,
+                "mensaje": f"No hay suficiente stock de {producto} (quedan {datos_producto['stock']})"
+            })
+
+        monto_total += datos_producto["precio"] * cantidad
+        detalles.append({
+            "producto": producto,
+            "cantidad": cantidad,
+            "precio": datos_producto["precio"],
+            "slot": slot_id
+        })
+
+    if not detalles:
+        return jsonify({"ok": False, "mensaje": "El carrito está vacío"})
+
+    # --- PASO 2: un único cobro por el total del carrito -----------------
+    # Cobramos UNA sola vez, por la suma de todo — así es como funciona
+    # un carrito real: no tiene sentido autorizar el pago producto por
+    # producto si el cliente está comprando varias cosas juntas.
+    aprobado = autorizar_pago_en_servidor(monto_total)
     if not aprobado:
         return jsonify({"ok": False, "mensaje": "Pago rechazado, probá de nuevo"})
 
-    entregado = arduino.abrir_compuerta(slot_id)
-    if not entregado:
-        return jsonify({"ok": False, "mensaje": "Se cobró pero no se detectó la entrega. Contactá soporte"})
+    # --- PASO 3: entregar cada unidad de cada producto --------------------
+    # Ya con el pago aprobado, vamos slot por slot. Guardamos qué se
+    # entregó bien y qué no, porque en la vida real un carrito con 3
+    # productos puede fallar en la entrega de uno solo (un atasco), y el
+    # cliente necesita saber exactamente qué sí retiró y qué no.
+    entregados = 0
+    productos_fallidos = []
 
-    descontar_stock(producto)
-    registrar_venta(producto, datos_producto["precio"])
+    for detalle in detalles:
+        for _ in range(detalle["cantidad"]):
+            entregado = arduino.abrir_compuerta(detalle["slot"])
 
-    producto_actualizado = obtener_producto(producto)
-    return jsonify({
-        "ok": True,
-        "mensaje": f"Listo, retirá tu {producto}. Stock restante: {producto_actualizado['stock']}"
-    })
+            if entregado:
+                descontar_stock(detalle["producto"])
+                registrar_venta(detalle["producto"], detalle["precio"])
+                entregados += 1
+            else:
+                productos_fallidos.append(detalle["producto"])
+
+    if productos_fallidos:
+        fallidos_unicos = ", ".join(sorted(set(productos_fallidos)))
+        mensaje = (
+            f"Se entregaron {entregados} producto(s). "
+            f"Hubo un problema entregando: {fallidos_unicos}. Contactá soporte."
+        )
+    else:
+        mensaje = f"¡Listo! Retirá tus {entregados} producto(s)."
+
+    return jsonify({"ok": True, "mensaje": mensaje})
