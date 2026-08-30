@@ -46,3 +46,12 @@ except ImportError:
     EMAIL_DESTINATARIO = None
     EMAIL_SMTP_HOST = "smtp.gmail.com"
     EMAIL_SMTP_PORT = 587
+
+# Mismo patrón para el Access Token de MercadoPago: nunca en este
+# archivo, siempre en config_secretos.py (que está en el .gitignore).
+try:
+    from config_secretos import MERCADOPAGO_ACCESS_TOKEN
+    MERCADOPAGO_HABILITADO = True
+except ImportError:
+    MERCADOPAGO_ACCESS_TOKEN = None
+    MERCADOPAGO_HABILITADO = False

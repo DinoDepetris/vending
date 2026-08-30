@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Escaneá para pagar</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+    <h2>Escaneá el QR con tu celular</h2>
+
+    <img src="data:image/png;base64,{{ qr_base64 }}"
+         style="width: 100%; max-width: 280px; display: block; margin: 0 auto;">
+
+    <p style="text-align: center; margin-top: 12px;">
+        <a href="{{ link_de_pago }}" target="_blank">¿No podés escanear? Abrí el link de pago</a>
+    </p>
+
+    <p id="estado" style="text-align: center; margin-top: 20px; font-weight: 500;">
+        Esperando el pago...
+    </p>
+
+    <script>
+        // Le preguntamos al servidor "¿ya se pagó?" cada 3 segundos.
+        // Cuando la respuesta sea que sí, nos vamos a la pantalla de
+        // resultado, que ahí sí muestra qué se entregó y de qué puerta.
+        async function chequearPago() {
+            // Este try/catch es la otra mitad del arreglo: si la
+            // consulta falla en el navegador (perdiste wifi un
+            // segundo, el servidor tardó de más), antes el error
+            // mataba el bucle entero en silencio. Ahora, pase lo que
+            // pase, siempre programamos el próximo intento.
+            try {
+                const respuesta = await fetch("/carrito/estado-pago");
+                const datos = await respuesta.json();
+
+                if (datos.aprobado) {
+                    window.location.href = "/carrito/resultado";
+                    return;
+                }
+            } catch (error) {
+                console.error("Error consultando el pago, reintentando:", error);
+            }
+
+            setTimeout(chequearPago, 3000);
+        }
+
+        chequearPago();
+    </script>
+</body>
+</html>

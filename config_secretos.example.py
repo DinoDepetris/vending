@@ -22,3 +22,9 @@ EMAIL_PASSWORD = "la contraseña de aplicación de 16 caracteres, no tu contrase
 EMAIL_DESTINATARIO = "adonde_quieras_que_lleguen_las_alertas@gmail.com"
 EMAIL_SMTP_HOST = "smtp.gmail.com"
 EMAIL_SMTP_PORT = 587
+
+# Para MercadoPago: entrá a mercadopago.com.ar/developers/panel/app,
+# creá una aplicación, y copiá el Access Token de la sección
+# "Credenciales de prueba" (empieza con TEST-). NUNCA uses acá el de
+# producción hasta estar seguro de que todo funciona bien.
+MERCADOPAGO_ACCESS_TOKEN = "TEST-tu-access-token-de-prueba-aca"
