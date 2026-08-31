@@ -18,6 +18,7 @@ from datos.categorias import (
     obtener_categorias_ordenadas, crear_categoria, contar_subcategorias,
     eliminar_categoria, renombrar_categoria
 )
+from datos.incidentes import obtener_incidentes, marcar_incidente_revisado
 from config import CONTRASEÑA_ADMIN
 
 admin_bp = Blueprint("admin", __name__)
@@ -262,3 +263,23 @@ def categorias_eliminar():
 
     eliminar_categoria(categoria_id)
     return redirect("/admin/categorias")
+
+
+@admin_bp.route("/incidentes")
+def panel_incidentes():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    incidentes = obtener_incidentes()
+    return render_template("admin_incidentes.html", incidentes=incidentes)
+
+
+@admin_bp.route("/incidentes/revisar", methods=["POST"])
+def incidentes_revisar():
+    if not session.get("autenticado"):
+        return redirect("/admin")
+
+    incidente_id = int(request.form.get("incidente_id"))
+    marcar_incidente_revisado(incidente_id)
+
+    return redirect("/admin/incidentes")

@@ -27,6 +27,11 @@ DB_PATH = "vending.db"
 # dispara la alerta de stock bajo.
 UMBRAL_STOCK_BAJO = 2
 
+# Si un pago con MercadoPago queda "pendiente" (ni aprobado ni
+# rechazado) más de esta cantidad de segundos, lo cancelamos
+# activamente en vez de dejar al cliente esperando indefinidamente.
+UMBRAL_SEGUNDOS_PAGO_PENDIENTE = 60
+
 # Las credenciales de email son datos sensibles de verdad — mucho más
 # que la contraseña del panel de admin — así que viven en un archivo
 # APARTE, config_secretos.py, que está en el .gitignore y nunca se sube

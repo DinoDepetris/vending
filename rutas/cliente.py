@@ -6,6 +6,8 @@ si algo del lado de MercadoPago fallara, el vending sigue pudiendo
 "vender" en modo simulado en vez de quedar totalmente roto.
 """
 
+import time
+
 from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for
 
 from datos.inventario import obtener_productos_en_venta, obtener_producto, descontar_stock, marcar_alerta_enviada
@@ -13,8 +15,9 @@ from datos.slots import obtener_slot_por_producto
 from datos.ventas import registrar_venta
 from simuladores import arduino, autorizar_pago_en_servidor
 from notificaciones import enviar_alerta_stock_bajo
-from config import UMBRAL_STOCK_BAJO, MERCADOPAGO_HABILITADO
-from pagos_mercadopago import crear_pago_con_qr, verificar_pago_aprobado
+from config import UMBRAL_STOCK_BAJO, MERCADOPAGO_HABILITADO, UMBRAL_SEGUNDOS_PAGO_PENDIENTE
+from pagos_mercadopago import crear_pago_con_qr, obtener_pagos_de_referencia, cancelar_pago
+from datos.incidentes import registrar_incidente
 
 cliente_bp = Blueprint("cliente", __name__)
 
@@ -205,14 +208,17 @@ def carrito_pagar():
             # todavía no sabemos si el cliente va a pagar de verdad.
             session["pago_pendiente"] = {
                 "referencia": pago["referencia"],
-                "detalles": detalles
+                "detalles": detalles,
+                "creado_en": time.time()
             }
             session["carrito"] = {}
 
             return render_template(
                 "pagando.html",
                 qr_base64=pago["qr_base64"],
-                link_de_pago=pago["link_de_pago"]
+                link_de_pago=pago["link_de_pago"],
+                referencia=pago["referencia"],
+                umbral_segundos=UMBRAL_SEGUNDOS_PAGO_PENDIENTE
             )
         except Exception as error:
             # Si MercadoPago falla (sin internet, token mal puesto),
@@ -267,25 +273,59 @@ def estado_pago():
         return jsonify({"aprobado": False, "error": "No hay ningún pago en curso"})
 
     try:
-        aprobado = verificar_pago_aprobado(pago_pendiente["referencia"])
+        pagos = obtener_pagos_de_referencia(pago_pendiente["referencia"])
     except Exception as error:
-        # Este es el arreglo clave: si la consulta a MercadoPago falla
-        # por lo que sea (un hipo de red, una respuesta rara), NO
-        # queremos que toda la ruta explote — eso es lo que mataba el
-        # polling en silencio. Devolvemos "todavía no" y dejamos que el
-        # próximo intento, en unos segundos, lo resuelva solo.
+        # Este es el arreglo clave del otro día: si la consulta a
+        # MercadoPago falla por lo que sea (un hipo de red, una
+        # respuesta rara), NO queremos que toda la ruta explote — eso
+        # es lo que mataba el polling en silencio. Devolvemos "todavía
+        # no" y dejamos que el próximo intento lo resuelva solo.
         print(f"[MERCADOPAGO] Error consultando el estado del pago, reintentando: {error}")
         return jsonify({"aprobado": False})
 
-    if not aprobado:
-        return jsonify({"aprobado": False})
+    if any(pago["status"] == "approved" for pago in pagos):
+        entregas, fallidos = _entregar_carrito(pago_pendiente["detalles"])
 
-    entregas, fallidos = _entregar_carrito(pago_pendiente["detalles"])
+        session["resultado_pago"] = {"entregas": entregas, "fallidos": fallidos}
+        session.pop("pago_pendiente", None)
 
-    session["resultado_pago"] = {"entregas": entregas, "fallidos": fallidos}
-    session.pop("pago_pendiente", None)
+        return jsonify({"aprobado": True})
 
-    return jsonify({"aprobado": True})
+    # Todavía no está aprobado. Antes de simplemente decir "seguí
+    # esperando", chequeamos cuánto tiempo pasó desde que se creó este
+    # pago — un vending no puede dejar a alguien parado esperando para
+    # siempre a que MercadoPago termine de decidir.
+    tiempo_transcurrido = time.time() - pago_pendiente["creado_en"]
+
+    if tiempo_transcurrido > UMBRAL_SEGUNDOS_PAGO_PENDIENTE:
+        # Cancelamos activamente cualquier pago que haya quedado en
+        # pending/in_process — esto es lo que libera al cliente para
+        # reintentar YA, en vez de dejar la transacción "flotando" del
+        # lado de MercadoPago hasta que se resuelva sola, horas después.
+        for pago in pagos:
+            if pago["status"] in ("pending", "in_process"):
+                try:
+                    cancelar_pago(pago["id"])
+                except Exception as error:
+                    print(f"[MERCADOPAGO] No se pudo cancelar el pago {pago['id']}: {error}")
+
+        # Antes de descartar la sesión, dejamos un rastro de qué había
+        # que entregar. Cancelar de nuestro lado no garantiza al 100%
+        # que MercadoPago no termine cobrando igual (por una demora en
+        # procesar la cancelación, o porque el cliente ya tenía la
+        # tarjeta cargada en otra pestaña) — sin este registro, esa
+        # plata podría quedar cobrada sin que nadie sepa qué se le
+        # debía al cliente a cambio.
+        registrar_incidente(
+            referencia=pago_pendiente["referencia"],
+            detalles=pago_pendiente["detalles"],
+            motivo="Cancelado por demora — revisar manualmente si MercadoPago lo cobró igual"
+        )
+
+        session.pop("pago_pendiente", None)
+        return jsonify({"aprobado": False, "cancelado": True})
+
+    return jsonify({"aprobado": False})
 
 
 @cliente_bp.route("/carrito/resultado")

@@ -18,13 +18,82 @@
         Esperando el pago...
     </p>
 
+    <p id="contador" style="text-align: center; color: #666; font-size: 14px;">
+        Si no se confirma, cancelamos automáticamente en <span id="segundos-restantes">{{ umbral_segundos }}</span> segundos
+    </p>
+
+    <div id="mensaje-timeout" class="oculto" style="text-align: center; margin-top: 20px;">
+        <p><strong>Tu pago tardó demasiado en confirmarse y lo cancelamos.</strong></p>
+        <p>No te preocupes: si en algún momento MercadoPago llegaba a aprobarlo igual
+           más tarde, ya no se te va a cobrar por esa transacción cancelada.</p>
+        <p>Volviendo a la tienda en <span id="segundos-vuelta">6</span> segundos...</p>
+        <p><a href="/">Volver ahora</a></p>
+    </div>
+
     <script>
-        // Le preguntamos al servidor "¿ya se pagó?" cada 3 segundos.
-        // Cuando la respuesta sea que sí, nos vamos a la pantalla de
-        // resultado, que ahí sí muestra qué se entregó y de qué puerta.
+        // El contador visible es puramente informativo — el que
+        // realmente decide cuándo cancelar es el servidor (ver
+        // config.py, UMBRAL_SEGUNDOS_PAGO_PENDIENTE). Acá solo mostramos
+        // una cuenta regresiva en pantalla para que el que está
+        // esperando sepa cuánto falta, en vez de mirar un cartel fijo
+        // sin ninguna noción del tiempo.
+        let segundosRestantes = {{ umbral_segundos }};
+        const spanSegundos = document.getElementById("segundos-restantes");
+
+        const intervaloContador = setInterval(() => {
+            segundosRestantes -= 1;
+            if (segundosRestantes >= 0) {
+                spanSegundos.innerText = segundosRestantes;
+            }
+            if (segundosRestantes <= 0) {
+                clearInterval(intervaloContador);
+            }
+        }, 1000);
+
+        function detenerContador() {
+            clearInterval(intervaloContador);
+            document.getElementById("contador").classList.add("oculto");
+        }
+        // El servidor ya tiene su propio límite de tiempo (ver
+        // config.py, UMBRAL_SEGUNDOS_PAGO_PENDIENTE): a los 60 segundos,
+        // si el pago sigue sin resolverse, lo CANCELA de verdad del
+        // lado de MercadoPago, y nos avisa acá con "cancelado": true.
+        // Este límite del navegador (90 segundos) es solo un respaldo,
+        // por si algo raro pasara y esa respuesta nunca llegara.
+        const LIMITE_INTENTOS = 30;
+        let intentos = 0;
+
+        function mostrarCancelado() {
+            detenerContador();
+            document.getElementById("estado").classList.add("oculto");
+            document.getElementById("mensaje-timeout").classList.remove("oculto");
+
+            // Mismo patrón que ya usamos en confirmacion.html: una
+            // cuenta regresiva que redirige sola a la tienda, para que
+            // el cliente no se quede parado en esta pantalla sin saber
+            // qué hacer.
+            let segundosVuelta = 6;
+            const spanVuelta = document.getElementById("segundos-vuelta");
+            const intervaloVuelta = setInterval(() => {
+                segundosVuelta -= 1;
+                spanVuelta.innerText = segundosVuelta;
+                if (segundosVuelta <= 0) {
+                    clearInterval(intervaloVuelta);
+                    window.location.href = "/";
+                }
+            }, 1000);
+        }
+
         async function chequearPago() {
-            // Este try/catch es la otra mitad del arreglo: si la
-            // consulta falla en el navegador (perdiste wifi un
+            intentos += 1;
+
+            if (intentos > LIMITE_INTENTOS) {
+                mostrarCancelado();
+                return;
+            }
+
+            // Este try/catch es la otra mitad del arreglo de ayer: si
+            // la consulta falla en el navegador (perdiste wifi un
             // segundo, el servidor tardó de más), antes el error
             // mataba el bucle entero en silencio. Ahora, pase lo que
             // pase, siempre programamos el próximo intento.
@@ -33,7 +102,17 @@
                 const datos = await respuesta.json();
 
                 if (datos.aprobado) {
+                    detenerContador();
                     window.location.href = "/carrito/resultado";
+                    return;
+                }
+
+                if (datos.cancelado) {
+                    // Esto es distinto de simplemente "dejar de
+                    // insistir" — el servidor ya canceló el pago de
+                    // verdad del lado de MercadoPago, así que cortamos
+                    // el polling ya mismo, sin esperar más intentos.
+                    mostrarCancelado();
                     return;
                 }
             } catch (error) {

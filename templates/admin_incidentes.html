@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Incidentes de pago</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body class="panel-admin">
+    <h2>Incidentes de pago</h2>
+    <p>Pagos que cancelamos por demora, pero que MercadoPago podría haber
+       cobrado igual. Revisá tu cuenta de MercadoPago buscando la referencia
+       o el monto y fecha, y marcá como revisado cuando confirmes qué pasó.</p>
+
+    {% if incidentes %}
+        <table>
+            <tr><th>Fecha</th><th>Monto</th><th>Productos</th><th>Estado</th><th></th></tr>
+            {% for incidente in incidentes %}
+            <tr>
+                <td>{{ incidente.fecha_hora }}</td>
+                <td>${{ incidente.monto }}</td>
+                <td>
+                    {% for item in incidente.detalles %}
+                        {{ item.producto }} x{{ item.cantidad }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </td>
+                <td>{% if incidente.revisado %}Revisado{% else %}Pendiente{% endif %}</td>
+                <td>
+                    {% if not incidente.revisado %}
+                    <form method="POST" action="/admin/incidentes/revisar">
+                        <input type="hidden" name="incidente_id" value="{{ incidente.id }}">
+                        <button type="submit">Marcar revisado</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>No hay incidentes registrados — buena señal.</p>
+    {% endif %}
+
+    <p><a href="/admin">Volver al panel</a></p>
+</body>
+</html>

@@ -161,7 +161,12 @@ th {
     z-index: 10;
 }
 
-#carrito-preview.oculto {
+/* Clase genérica para ocultar cualquier elemento con JavaScript — la
+   usan tanto la vista previa del carrito como los mensajes de
+   pagando.html. Antes estaba mal escrita como "#carrito-preview.oculto"
+   (atada a un solo elemento), por eso no ocultaba nada en otros
+   lugares donde la reusamos. */
+.oculto {
     display: none;
 }
 

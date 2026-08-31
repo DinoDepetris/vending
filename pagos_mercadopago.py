@@ -36,7 +36,22 @@ def crear_pago_con_qr(monto_total):
             "quantity": 1,
             "unit_price": float(monto_total)
         }],
-        "external_reference": referencia
+        "external_reference": referencia,
+
+        # Excluimos los métodos de pago offline (Rapipago, Pago Fácil y
+        # similares) — son formas de pago en efectivo, en OTRO lugar
+        # físico, pensadas para compras online donde el cliente puede
+        # esperar días. En un vending eso no tiene sentido: nadie va a
+        # ir a pagar a un Rapipago y volver después a buscar el
+        # producto. Con esto, MercadoPago solo ofrece tarjeta y saldo
+        # de cuenta, que en la vida real resuelven casi siempre al
+        # instante — reduce mucho la chance de quedar "pendiente".
+        "payment_methods": {
+            "excluded_payment_types": [
+                {"id": "ticket"},
+                {"id": "atm"}
+            ]
+        }
     }
 
     respuesta = sdk.preference().create(datos_preferencia)
@@ -69,13 +84,23 @@ def crear_pago_con_qr(monto_total):
     }
 
 
-def verificar_pago_aprobado(referencia):
+def obtener_pagos_de_referencia(referencia):
     sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN)
 
-    # Le pedimos a MercadoPago: "buscame todos los pagos que tengan
-    # esta referencia externa". Si el cliente ya pagó, va a aparecer
-    # acá con status "approved".
+    # Le pedimos a MercadoPago: "buscame todos los pagos que tengan esta
+    # referencia externa". Devolvemos la lista completa (no solo un
+    # sí/no) porque ahora necesitamos más detalle: no solo si algo se
+    # aprobó, sino también los "id" de los pagos que quedaron en
+    # pendiente, para poder cancelarlos si tardan demasiado.
     resultado = sdk.payment().search({"external_reference": referencia})
-    pagos = resultado["response"]["results"]
+    return resultado["response"]["results"]
 
-    return any(pago["status"] == "approved" for pago in pagos)
+
+def cancelar_pago(payment_id):
+    # Cancelar un pago pendiente/en revisión le dice a MercadoPago
+    # "este intento no va más" — libera esa transacción del lado de
+    # ellos, para que el cliente pueda reintentar de cero en vez de
+    # quedar con un pago fantasma que capaz se resuelve solo, horas
+    # después, cuando el cliente ya se fue de la máquina.
+    sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN)
+    sdk.payment().update(payment_id, {"status": "cancelled"})
