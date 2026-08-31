@@ -175,7 +175,11 @@ def slots_asignar():
     if categoria_id:
         categoria_id = int(categoria_id)
 
-    crear_o_actualizar_producto(producto, precio, stock, categoria_id)
+    # Igual que categoria_id: si el campo queda vacío, guardamos None
+    # (sin foto asignada todavía) en vez de un string vacío.
+    imagen = request.form.get("imagen") or None
+
+    crear_o_actualizar_producto(producto, precio, stock, categoria_id, imagen)
     asignar_producto_a_slot(slot_id, producto)
 
     return redirect("/admin/slots")
@@ -224,8 +228,10 @@ def categorias_crear():
     if categoria_padre_id:
         categoria_padre_id = int(categoria_padre_id)
 
+    icono = request.form.get("icono") or None
+
     if nombre:
-        crear_categoria(nombre, categoria_padre_id)
+        crear_categoria(nombre, categoria_padre_id, icono)
 
     return redirect("/admin/categorias")
 

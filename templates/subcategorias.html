@@ -14,14 +14,29 @@
         {% include "_carrito_widget.html" %}
     </div>
 
+    <div id="grilla-categorias">
+        {% for subcategoria in subcategorias %}
+        <a href="/categoria/{{ subcategoria.id }}" class="categoria-tile categoria-color-{{ loop.index0 % 4 }}">
+            <i class="ti {{ subcategoria.icono or 'ti-category-2' }}" aria-hidden="true"></i>
+            <span>{{ subcategoria.nombre }}</span>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Renombramos productos_directos a "inventario" acá, así las
+         piezas compartidas (_producto_tile.html, _producto_tile_script.html)
+         funcionan igual que en tienda.html, sin necesitar una versión
+         aparte solo por el nombre de la variable. Si no hay productos
+         directos, queda como un diccionario vacío — no rompe nada. -->
+    {% set inventario = productos_directos or {} %}
+
     {% if inventario %}
+        <h3 style="padding: 4px 20px; font-size: 15px;">Otros productos acá</h3>
         <div id="grilla-productos">
             {% for nombre, datos in inventario.items() %}
                 {% include "_producto_tile.html" %}
             {% endfor %}
         </div>
-    {% else %}
-        <p class="mensaje-vacio">No hay productos disponibles en esta categoría ahora mismo.</p>
     {% endif %}
 
     {% include "_carrito_script.html" %}

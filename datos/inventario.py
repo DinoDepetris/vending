@@ -64,6 +64,17 @@ def inicializar_base_de_datos():
     except sqlite3.OperationalError:
         pass
 
+    # Misma técnica para la foto del producto: guardamos solo el NOMBRE
+    # del archivo (por ejemplo "coca_500.jpg"), no la imagen en sí. El
+    # archivo real vive en la carpeta static/productos/ — cuando tengas
+    # las fotos, las copiás ahí directamente, sin tocar código ni base
+    # de datos de nuevo.
+    try:
+        conn.execute("ALTER TABLE inventario ADD COLUMN imagen TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     conn.close()
 
 
@@ -83,20 +94,18 @@ def obtener_producto(producto):
     return dict(fila) if fila else None
 
 
-def crear_o_actualizar_producto(producto, precio, stock, categoria_id=None):
+def crear_o_actualizar_producto(producto, precio, stock, categoria_id=None, imagen=None):
     conn = obtener_conexion()
 
-    # Mismo "upsert" que antes, ahora con una columna más. categoria_id
-    # puede ser None (sin categoría asignada) perfectamente — no es
-    # obligatorio elegir una.
     conn.execute("""
-        INSERT INTO inventario (producto, precio, stock, categoria_id)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO inventario (producto, precio, stock, categoria_id, imagen)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(producto) DO UPDATE SET
             precio = excluded.precio,
             stock = excluded.stock,
-            categoria_id = excluded.categoria_id
-    """, (producto, precio, stock, categoria_id))
+            categoria_id = excluded.categoria_id,
+            imagen = excluded.imagen
+    """, (producto, precio, stock, categoria_id, imagen))
     conn.commit()
     conn.close()
 
@@ -164,10 +173,61 @@ def obtener_productos_en_venta():
     # (producto NULL), simplemente no aparece en el resultado — es
     # justo el filtro que hace que la tienda no muestre nada sin asignar.
     filas = conn.execute("""
-        SELECT inventario.producto, inventario.precio, inventario.stock, slots.id AS slot
+        SELECT inventario.producto, inventario.precio, inventario.stock,
+               inventario.categoria_id, inventario.imagen, slots.id AS slot
         FROM slots
         JOIN inventario ON slots.producto = inventario.producto
         WHERE slots.producto IS NOT NULL
+        ORDER BY slots.id
+    """).fetchall()
+    conn.close()
+    return {fila["producto"]: dict(fila) for fila in filas}
+
+
+def obtener_productos_en_venta_por_categorias(categoria_ids):
+    # Variante de la función de arriba, pero filtrada a un conjunto de
+    # categorías puntual. La usa la pantalla de "productos dentro de
+    # una categoría" — categoria_ids ya viene calculado desde
+    # datos/categorias.py incluyendo la categoría elegida MÁS todas sus
+    # subcategorías, para que tocar "Bebidas" muestre también lo que
+    # esté en "Gaseosas" o "Aguas" sin que el cliente tenga que navegar
+    # un nivel más.
+    if not categoria_ids:
+        return {}
+
+    conn = obtener_conexion()
+
+    # "?, ?, ?" repetido tantas veces como categorías tengamos — SQLite
+    # no permite pasar una lista directamente en un IN (...), hay que
+    # armar la cantidad exacta de signos de pregunta de antemano.
+    signos_de_pregunta = ",".join("?" for _ in categoria_ids)
+
+    filas = conn.execute(f"""
+        SELECT inventario.producto, inventario.precio, inventario.stock,
+               inventario.categoria_id, inventario.imagen, slots.id AS slot
+        FROM slots
+        JOIN inventario ON slots.producto = inventario.producto
+        WHERE slots.producto IS NOT NULL
+          AND inventario.categoria_id IN ({signos_de_pregunta})
+        ORDER BY slots.id
+    """, list(categoria_ids)).fetchall()
+    conn.close()
+    return {fila["producto"]: dict(fila) for fila in filas}
+
+
+def obtener_productos_en_venta_sin_categoria():
+    # Los productos que están a la venta pero todavía no tienen
+    # categoría asignada — por ejemplo, los que ya tenías cargados
+    # antes de que existiera este sistema de categorías. Sin esta
+    # función, esos productos se volverían invisibles de golpe al
+    # pasar a navegación por categorías, sin que nadie se diera cuenta.
+    conn = obtener_conexion()
+    filas = conn.execute("""
+        SELECT inventario.producto, inventario.precio, inventario.stock,
+               inventario.categoria_id, inventario.imagen, slots.id AS slot
+        FROM slots
+        JOIN inventario ON slots.producto = inventario.producto
+        WHERE slots.producto IS NOT NULL AND inventario.categoria_id IS NULL
         ORDER BY slots.id
     """).fetchall()
     conn.close()

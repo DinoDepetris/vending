@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tienda</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+</head>
+<body>
+    <div class="header">
+        <h2>¿Qué buscás?</h2>
+        {% include "_carrito_widget.html" %}
+    </div>
+
+    {% if mensaje %}
+        <p class="mensaje-aviso">{{ mensaje }}</p>
+    {% endif %}
+
+    {% if categorias %}
+        <div id="grilla-categorias">
+            {% for categoria in categorias %}
+            <a href="/categoria/{{ categoria.id }}" class="categoria-tile categoria-color-{{ loop.index0 % 4 }}">
+                <i class="ti {{ categoria.icono or 'ti-category-2' }}" aria-hidden="true"></i>
+                <span>{{ categoria.nombre }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="mensaje-vacio">Todavía no hay productos cargados para mostrar.</p>
+    {% endif %}
+
+    {% include "_carrito_script.html" %}
+</body>
+</html>

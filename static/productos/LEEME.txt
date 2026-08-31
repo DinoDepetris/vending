@@ -1,0 +1,15 @@
+Poné acá las fotos de tus productos.
+
+Cada foto tiene que llamarse EXACTAMENTE igual al "nombre" que le
+pusiste al producto en /admin/slots, con la extensión del archivo
+(.jpg, .png, etc). Por ejemplo, si tu producto se llama "coca_500",
+la foto tiene que ser: coca_500.jpg
+
+Después, en /admin/slots, al asignar (o reasignar) ese producto a un
+slot, escribí el nombre exacto del archivo (con extensión) en el
+campo "imagen" del formulario. Si lo dejás vacío, la tienda muestra
+un ícono genérico en su lugar — no rompe nada.
+
+Recomendación para que todas las fotos se vean parejas: mismo tamaño
+(por ejemplo 400x400 píxeles), mismo fondo (blanco o transparente),
+y el producto centrado y ocupando la mayor parte del cuadro.

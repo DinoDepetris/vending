@@ -1,0 +1,33 @@
+<script>
+    async function actualizarProductos() {
+        const respuesta = await fetch("/estado");
+        const productos = await respuesta.json();
+
+        for (const nombre in productos) {
+            const datos = productos[nombre];
+            const tile = document.getElementById("producto-" + nombre);
+            if (!tile) continue;
+
+            // Actualizamos el tope del stepper con el stock más
+            // reciente — si alguien más compró mientras vos mirabas
+            // esta pantalla, el "+" no te va a dejar elegir más de lo
+            // que realmente queda ahora.
+            stockDisponible[nombre] = datos.stock;
+
+            const precioTexto = tile.querySelector(".producto-tile-precio");
+            if (precioTexto) precioTexto.innerText = "$" + datos.precio;
+
+            const botonAgregar = tile.querySelector(".btn-agregar-tile");
+
+            if (datos.stock <= 0) {
+                tile.classList.add("agotado");
+                if (botonAgregar) botonAgregar.disabled = true;
+            } else {
+                tile.classList.remove("agotado");
+                if (botonAgregar) botonAgregar.disabled = false;
+            }
+        }
+    }
+
+    setInterval(actualizarProductos, 4000);
+</script>

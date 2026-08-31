@@ -1,0 +1,39 @@
+<script>
+    // cantidadesTile: cuántas unidades elegiste con el stepper para cada
+    // producto, ANTES de tocar "Agregar" — se resetea a 1 después de
+    // cada agregado. stockDisponible: el stock actual de cada producto,
+    // usado para no dejarte subir el stepper más allá de lo que hay de
+    // verdad (el servidor igual lo controla en serio — esto es solo
+    // para que el stepper no deje elegir un número imposible).
+    let cantidadesTile = {};
+    let stockDisponible = {
+        {% for nombre, datos in inventario.items() %}
+        "{{ nombre }}": {{ datos.stock }},
+        {% endfor %}
+    };
+
+    function cambiarCantidadTile(producto, delta) {
+        const actual = cantidadesTile[producto] || 1;
+        const maximo = stockDisponible[producto] || 0;
+
+        let nueva = actual + delta;
+        nueva = Math.max(1, Math.min(nueva, maximo));
+
+        cantidadesTile[producto] = nueva;
+
+        const span = document.getElementById("cantidad-" + producto);
+        if (span) span.innerText = nueva;
+    }
+
+    async function agregarConCantidad(producto) {
+        const cantidad = cantidadesTile[producto] || 1;
+        await agregarAlCarrito(producto, cantidad);
+
+        // Después de agregar, el stepper de esa tarjeta vuelve a 1 —
+        // así la próxima vez que toques "+" empezás de cero, en vez de
+        // seguir sumando sobre lo que ya quedó en el carrito.
+        cantidadesTile[producto] = 1;
+        const span = document.getElementById("cantidad-" + producto);
+        if (span) span.innerText = 1;
+    }
+</script>

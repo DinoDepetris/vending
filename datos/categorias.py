@@ -28,14 +28,23 @@ def inicializar_tabla_categorias():
         )
     """)
     conn.commit()
+
+    # Mismo patrón de migración que ya usamos en inventario.py: agrega
+    # la columna si falta, y no hace nada si ya existía.
+    try:
+        conn.execute("ALTER TABLE categorias ADD COLUMN icono TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     conn.close()
 
 
-def crear_categoria(nombre, categoria_padre_id=None):
+def crear_categoria(nombre, categoria_padre_id=None, icono=None):
     conn = obtener_conexion()
     conn.execute(
-        "INSERT INTO categorias (nombre, categoria_padre_id) VALUES (?, ?)",
-        (nombre, categoria_padre_id)
+        "INSERT INTO categorias (nombre, categoria_padre_id, icono) VALUES (?, ?, ?)",
+        (nombre, categoria_padre_id, icono)
     )
     conn.commit()
     conn.close()
@@ -119,3 +128,93 @@ def renombrar_categoria(categoria_id, nuevo_nombre):
     )
     conn.commit()
     conn.close()
+
+
+def obtener_subcategorias_directas(categoria_id):
+    # A diferencia de obtener_ids_con_descendientes (que junta TODO el
+    # árbol de abajo), esta trae solo las hijas inmediatas — las que
+    # van a mostrarse como botones en la pantalla intermedia de
+    # subcategorías, sin saltarse ningún nivel.
+    conn = obtener_conexion()
+    filas = conn.execute(
+        "SELECT * FROM categorias WHERE categoria_padre_id = ? ORDER BY nombre", (categoria_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(fila) for fila in filas]
+
+
+def obtener_ids_con_descendientes(categoria_id):
+    # Devuelve un conjunto con ESTA categoría más TODAS sus
+    # subcategorías, sin importar cuántos niveles tenga — es lo que
+    # usamos para que tocar "Bebidas" en la tienda muestre también los
+    # productos de "Gaseosas" y "Aguas", sin que el cliente tenga que
+    # entrar un nivel más para verlos.
+    conn = obtener_conexion()
+    filas = conn.execute("SELECT id, categoria_padre_id FROM categorias").fetchall()
+    conn.close()
+
+    hijas_de = {}
+    for fila in filas:
+        hijas_de.setdefault(fila["categoria_padre_id"], []).append(fila["id"])
+
+    resultado = {categoria_id}
+
+    def agregar_hijas(id_actual):
+        for hijo_id in hijas_de.get(id_actual, []):
+            resultado.add(hijo_id)
+            agregar_hijas(hijo_id)
+
+    agregar_hijas(categoria_id)
+    return resultado
+
+
+def obtener_categorias_raiz_con_productos():
+    # Para la pantalla de inicio (la "botonera"): solo mostramos
+    # categorías raíz que TIENEN al menos un producto a la venta ahora
+    # mismo — mostrar una categoría vacía sería confuso para el
+    # cliente, que tocaría el botón y no vería nada adentro.
+    #
+    # Importamos acá adentro (no arriba del archivo) para evitar un
+    # problema de "importación circular": inventario.py no necesita
+    # saber nada de categorías, pero categorías sí necesita consultar
+    # inventario — importarlo adentro de la función, en vez de al
+    # principio del archivo, evita ese conflicto.
+    from datos.inventario import obtener_productos_en_venta
+
+    productos = obtener_productos_en_venta()
+    categorias = obtener_categorias_ordenadas()
+    categorias_por_id = {c["id"]: c for c in categorias}
+
+    def encontrar_raiz(categoria_id):
+        actual = categorias_por_id.get(categoria_id)
+        while actual and actual["categoria_padre_id"] is not None:
+            actual = categorias_por_id.get(actual["categoria_padre_id"])
+        return actual
+
+    raices_con_productos = {}
+    hay_productos_sin_categoria = False
+
+    for producto in productos.values():
+        categoria_id = producto.get("categoria_id")
+
+        if categoria_id is None:
+            hay_productos_sin_categoria = True
+            continue
+
+        raiz = encontrar_raiz(categoria_id)
+        if raiz:
+            raices_con_productos[raiz["id"]] = raiz
+
+    resultado = [
+        {"id": categoria["id"], "nombre": categoria["nombre"], "icono": categoria["icono"]}
+        for categoria in raices_con_productos.values()
+    ]
+
+    # Si hay productos sin ninguna categoría asignada, les damos un
+    # "cajón" propio en vez de dejarlos invisibles — algo que puede
+    # pasar con productos que ya tenías cargados antes de armar este
+    # sistema de categorías.
+    if hay_productos_sin_categoria:
+        resultado.append({"id": "otros", "nombre": "Otros", "icono": "ti-dots"})
+
+    return resultado

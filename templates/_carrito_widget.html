@@ -1,0 +1,23 @@
+<!-- Esto se reutiliza en categorias.html y tienda.html mediante un
+     "include" de Jinja — en vez de copiar y pegar el mismo HTML del
+     carrito en cada pantalla, lo escribimos una sola vez acá y cada
+     plantilla que lo necesita lo inserta con una sola línea. Si mañana
+     hay que cambiarle algo al ícono del carrito, se edita en un solo
+     lugar.
+
+     Ojo con este detalle: nunca escribas la sintaxis real de Jinja
+     (las llaves con el signo de porcentaje) dentro de un comentario
+     como este — Jinja no distingue "esto es un comentario para
+     humanos", intenta interpretar cualquier llave-porcentaje que
+     encuentre en el archivo, esté donde esté. -->
+<div class="carrito-wrapper">
+    <button id="btn-carrito" onclick="alternarPreview()" aria-label="Ver carrito">
+        <i class="ti ti-shopping-cart"></i>
+        <span id="contador-carrito">{{ resumen.cantidad_total }}</span>
+    </button>
+    <div id="carrito-preview" class="oculto">
+        <div id="preview-items"></div>
+        <p>Total: $<span id="preview-total">{{ resumen.total }}</span></p>
+        <a href="/carrito" class="btn-like">Ir al carrito</a>
+    </div>
+</div>

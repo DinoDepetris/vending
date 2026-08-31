@@ -1,0 +1,95 @@
+<script>
+    // Arrancamos con lo que ya había en el carrito guardado en la
+    // sesión del servidor (por si volviste con algo adentro), y desde
+    // acá en más lo mantenemos actualizado con cada respuesta del
+    // servidor. Ahora cada línea también trae "stock" — lo necesitamos
+    // para saber cuándo el botón "+" tiene que dejar de reaccionar.
+    let carritoActual = {
+        lineas: [
+            {% for linea in resumen.lineas %}
+            {producto: "{{ linea.producto }}", cantidad: {{ linea.cantidad }}, subtotal: {{ linea.subtotal }}, stock: {{ linea.stock }}},
+            {% endfor %}
+        ],
+        total: {{ resumen.total }},
+        cantidad_total: {{ resumen.cantidad_total }}
+    };
+
+    function renderizarPreview() {
+        const contenedor = document.getElementById("preview-items");
+        contenedor.innerHTML = "";
+
+        for (const linea of carritoActual.lineas) {
+            // Si ya llegaste al stock disponible, el "+" queda apagado
+            // visualmente — el servidor de todas formas no te va a
+            // dejar pasarte aunque lo intentaras; esto es solo para que
+            // se entienda por qué dejó de reaccionar.
+            const yaEnElTope = linea.cantidad >= linea.stock;
+
+            const fila = document.createElement("div");
+            fila.className = "carrito-linea";
+            fila.innerHTML = `
+                <div class="carrito-linea-info">
+                    <span>${linea.producto}</span>
+                    <span>$${linea.subtotal}</span>
+                </div>
+                <div class="carrito-linea-controles">
+                    <div class="stepper-mini">
+                        <span onclick="ajustarCantidadPreview('${linea.producto}', -1)">−</span>
+                        <span>${linea.cantidad}</span>
+                        <span onclick="ajustarCantidadPreview('${linea.producto}', 1)"
+                              class="${yaEnElTope ? 'stepper-deshabilitado' : ''}">+</span>
+                    </div>
+                    <span class="quitar-x" onclick="quitarDelCarritoPreview('${linea.producto}')" aria-label="Quitar">✕</span>
+                </div>
+            `;
+            contenedor.appendChild(fila);
+        }
+
+        document.getElementById("preview-total").innerText = carritoActual.total;
+        document.getElementById("contador-carrito").innerText = carritoActual.cantidad_total;
+    }
+
+    async function ajustarCantidadPreview(producto, delta) {
+        // Reusa la misma ruta /carrito/ajustar que suma o resta, según
+        // el signo de delta. El servidor es quien de verdad aplica el
+        // tope de stock — este botón solo dispara el pedido.
+        const respuesta = await fetch("/carrito/ajustar", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({producto: producto, delta: delta})
+        });
+
+        carritoActual = await respuesta.json();
+        renderizarPreview();
+    }
+
+    async function quitarDelCarritoPreview(producto) {
+        // A diferencia de ajustar de a uno, esto saca el producto del
+        // carrito de una — es el botón "✕" explícito que faltaba.
+        const respuesta = await fetch("/carrito/quitar", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({producto: producto})
+        });
+
+        carritoActual = await respuesta.json();
+        renderizarPreview();
+    }
+
+    async function agregarAlCarrito(producto, cantidad) {
+        cantidad = cantidad || 1;
+
+        const respuesta = await fetch("/carrito/agregar", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({producto: producto, cantidad: cantidad})
+        });
+
+        carritoActual = await respuesta.json();
+        renderizarPreview();
+    }
+
+    function alternarPreview() {
+        document.getElementById("carrito-preview").classList.toggle("oculto");
+    }
+</script>

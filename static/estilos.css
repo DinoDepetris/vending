@@ -1,13 +1,39 @@
-/* Antes, este bloque de estilos vivía pegado dentro del string de HTML
-   en servidor_vending.py. Separarlo en su propio archivo .css tiene una
-   ventaja concreta: el editor de código ahora te resalta y valida CSS
-   de verdad, cosa que no pasaba bien cuando estaba mezclado adentro de
-   un string de Python. */
+/* Cargamos las dos tipografías del proyecto: Fraunces (con carácter,
+   para nombres de producto, precios y títulos) e Inter (bien legible,
+   para todo lo funcional: botones, cantidades, texto de apoyo). Cargar
+   las dos desde Google Fonts evita depender de que la tablet tenga
+   estas fuentes instaladas de antes. */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+    /* Paleta del proyecto, en variables — así, si en algún momento
+       querés ajustar un color, lo cambiás en un solo lugar y se
+       actualiza en toda la app, en vez de buscar cada aparición. */
+    --color-fondo: #FAF6EF;
+    --color-superficie: #FFFFFF;
+    --color-texto: #1C1B19;
+    --color-texto-suave: #8A8477;
+    --color-borde: #E4DDD0;
+    --color-primario: #1F4D3D;
+    --color-primario-oscuro: #14332A;
+    --color-acento: #C98A2C;
+    --color-acento-texto: #241B08;
+    --color-error: #B3261E;
+}
 
 body {
-    font-family: sans-serif;
-    max-width: 400px;
-    margin: 40px auto;
+    font-family: 'Inter', sans-serif;
+    background: var(--color-fondo);
+    color: var(--color-texto);
+    max-width: 420px;
+    margin: 0 auto;
+    padding-bottom: 24px;
+}
+
+h2, h3 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    margin: 0;
 }
 
 button {
@@ -15,8 +41,13 @@ button {
     width: 100%;
     padding: 12px;
     margin: 8px 0;
-    font-size: 16px;
+    font-size: 15px;
+    font-family: 'Inter', sans-serif;
     cursor: pointer;
+    background: var(--color-primario);
+    color: var(--color-fondo);
+    border: none;
+    border-radius: 24px;
 }
 
 button:disabled {
@@ -24,18 +55,317 @@ button:disabled {
     cursor: not-allowed;
 }
 
+a {
+    color: var(--color-primario);
+}
+
 #resultado {
     margin-top: 20px;
-    padding: 12px;
-    background: #eee;
-    border-radius: 8px;
+    padding: 12px 16px;
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: 12px;
     white-space: pre-wrap;
     min-height: 40px;
 }
 
-/* Estilos específicos del panel de administración */
+.mensaje-aviso {
+    text-align: center;
+    color: var(--color-error);
+    margin: 4px 20px 0;
+    font-size: 14px;
+}
+
+.mensaje-vacio {
+    text-align: center;
+    color: var(--color-texto-suave);
+    margin-top: 40px;
+    padding: 0 20px;
+}
+
+/* --- Encabezado, compartido por categorías y tienda --- */
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 22px 20px 4px;
+}
+
+.header-titulo-con-volver {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-titulo-con-volver a {
+    color: var(--color-texto);
+    text-decoration: none;
+    font-size: 20px;
+    display: flex;
+}
+
+/* --- Carrito: ícono y vista previa desplegable --- */
+
+.carrito-wrapper {
+    position: relative;
+}
+
+#btn-carrito {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 8px 14px;
+    background: var(--color-primario);
+    color: var(--color-fondo);
+    border-radius: 24px;
+    font-size: 14px;
+}
+
+#carrito-preview {
+    position: absolute;
+    right: 0;
+    top: 110%;
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: 14px;
+    padding: 14px;
+    width: 240px;
+    z-index: 10;
+}
+
+.producto-tile-precio-cantidad {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+}
+
+/* .stepper-mini se reutiliza en tres lugares distintos: adentro de cada
+   tarjeta de producto (con <span>), en la vista previa del carrito (con
+   <span>), y en la pantalla completa del carrito (con <form><button>,
+   porque ahí no usamos JavaScript). Por eso el CSS de acá adentro
+   cubre los dos casos, en vez de asumir uno solo. */
+.stepper-mini {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--color-borde);
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.stepper-mini span {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--color-primario);
+    cursor: pointer;
+}
+
+.stepper-mini form {
+    display: inline;
+    margin: 0;
+}
+
+.stepper-mini button {
+    width: 22px;
+    height: 22px;
+    line-height: 1;
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--color-primario);
+    font-size: 14px;
+}
+
+.btn-agregar-tile {
+    width: 100%;
+    padding: 7px;
+    margin: 8px 0 0;
+    font-size: 12px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.btn-agregar-tile i {
+    font-size: 14px;
+}
+
+.carrito-linea {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 13px;
+    gap: 8px;
+}
+
+.carrito-linea-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.carrito-linea-controles {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quitar-x {
+    cursor: pointer;
+    color: var(--color-texto-suave);
+    font-size: 15px;
+    padding: 2px 4px;
+}
+
+.stepper-deshabilitado {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.oculto {
+    display: none;
+}
+
+.btn-like {
+    display: block;
+    text-align: center;
+    padding: 9px;
+    margin-top: 10px;
+    background: var(--color-acento);
+    color: var(--color-acento-texto);
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* --- Pantalla de inicio: botonera de categorías --- */
+
+#grilla-categorias {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 16px 20px 20px;
+}
+
+.categoria-tile {
+    border-radius: 14px;
+    padding: 22px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.categoria-tile i {
+    font-size: 34px;
+}
+
+/* Cuatro variantes de color, que se van repitiendo en orden — así cada
+   categoría se distingue de la de al lado sin que hayamos tenido que
+   guardar un color por categoría en la base de datos. */
+.categoria-color-0 { background: var(--color-primario); color: var(--color-fondo); }
+.categoria-color-1 { background: var(--color-acento); color: var(--color-acento-texto); }
+.categoria-color-2 { background: #8C6A46; color: var(--color-fondo); }
+.categoria-color-3 { background: #3E6659; color: var(--color-fondo); }
+
+/* --- Pantalla de productos dentro de una categoría --- */
+
+#grilla-productos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 14px 20px 16px;
+}
+
+.producto-tile {
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+}
+
+.producto-tile.agotado {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.producto-imagen {
+    aspect-ratio: 1;
+    background: #EFE9DC;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.producto-imagen img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.producto-imagen i {
+    font-size: 28px;
+    color: #B8AF9C;
+}
+
+.producto-tile-info {
+    padding: 10px 12px 12px;
+}
+
+.producto-tile-nombre {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--color-texto);
+    margin: 0 0 4px;
+}
+
+.producto-tile-precio {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--color-primario);
+    margin: 0;
+}
+
+.producto-tile-etiqueta {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--color-error);
+    color: white;
+    font-size: 10px;
+    font-family: 'Inter', sans-serif;
+    padding: 3px 8px;
+    border-radius: 10px;
+}
+
+/* --- Estilos específicos del panel de administración --- */
+/* Estas pantallas las usa el operador de la máquina, no el cliente, así
+   que se mantienen simples y funcionales — no hace falta la misma
+   inversión visual que en las pantallas de venta. */
+
 body.panel-admin {
     max-width: 480px;
+    padding: 20px;
 }
 
 table {
@@ -45,7 +375,7 @@ table {
 
 th {
     text-align: left;
-    border-bottom: 1px solid #ccc;
+    border-bottom: 1px solid var(--color-borde);
 }
 
 .form-reponer {
@@ -60,123 +390,16 @@ th {
 .form-slot {
     display: flex;
     gap: 4px;
+    flex-wrap: wrap;
 }
 
 .form-slot input {
     width: 70px;
 }
 
-/* Los formularios de editar/eliminar categoría van en línea, uno al
-   lado del otro — igual razón que con el botón del carrito: sin esto
-   heredarían el "width: 100%" del estilo general de <button>. */
 #lista-categorias button,
 #lista-categorias form {
     width: auto;
     display: inline-flex;
     margin: 0;
-}
-
-/* --- Carrito y lista de productos con cantidad --- */
-
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* El botón del carrito no debe heredar el "width: 100%" del estilo
-   general de <button> de más arriba — por eso lo sobrescribimos acá,
-   así queda un botón chico, no una franja que ocupa toda la pantalla. */
-#btn-carrito {
-    width: auto;
-    display: inline-block;
-    margin: 0;
-    padding: 8px 14px;
-}
-
-.producto {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 10px;
-    margin-bottom: 8px;
-}
-
-.producto-info {
-    display: flex;
-    justify-content: space-between;
-    font-size: 14px;
-    margin-bottom: 8px;
-    color: #333;
-}
-
-.producto-controles {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-}
-
-.producto-controles input[type="number"] {
-    width: 60px;
-}
-
-.producto-controles button {
-    width: auto;
-    flex: 1;
-    margin: 0;
-}
-
-.carrito-linea {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-    font-size: 14px;
-}
-
-.carrito-linea button {
-    width: auto;
-    padding: 4px 8px;
-    font-size: 13px;
-    margin: 0;
-}
-
-/* La vista previa flota sobre el ícono del carrito, por eso el
-   contenedor "padre" (carrito-wrapper) necesita position: relative —
-   así carrito-preview, que es position: absolute, se ubica en relación
-   a ÉL, y no a toda la página. */
-.carrito-wrapper {
-    position: relative;
-}
-
-#carrito-preview {
-    position: absolute;
-    right: 0;
-    top: 110%;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 12px;
-    width: 220px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-    z-index: 10;
-}
-
-/* Clase genérica para ocultar cualquier elemento con JavaScript — la
-   usan tanto la vista previa del carrito como los mensajes de
-   pagando.html. Antes estaba mal escrita como "#carrito-preview.oculto"
-   (atada a un solo elemento), por eso no ocultaba nada en otros
-   lugares donde la reusamos. */
-.oculto {
-    display: none;
-}
-
-.btn-like {
-    display: block;
-    text-align: center;
-    padding: 8px;
-    margin-top: 10px;
-    background: #eee;
-    border-radius: 6px;
-    text-decoration: none;
-    color: #000;
 }

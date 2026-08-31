@@ -10,9 +10,16 @@ import time
 
 from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for
 
-from datos.inventario import obtener_productos_en_venta, obtener_producto, descontar_stock, marcar_alerta_enviada
+from datos.inventario import (
+    obtener_productos_en_venta, obtener_producto, descontar_stock, marcar_alerta_enviada,
+    obtener_productos_en_venta_por_categorias, obtener_productos_en_venta_sin_categoria
+)
 from datos.slots import obtener_slot_por_producto
 from datos.ventas import registrar_venta
+from datos.categorias import (
+    obtener_categorias_raiz_con_productos, obtener_ids_con_descendientes, obtener_categoria,
+    obtener_subcategorias_directas, contar_subcategorias
+)
 from simuladores import arduino, autorizar_pago_en_servidor
 from notificaciones import enviar_alerta_stock_bajo
 from config import UMBRAL_STOCK_BAJO, MERCADOPAGO_HABILITADO, UMBRAL_SEGUNDOS_PAGO_PENDIENTE
@@ -34,13 +41,15 @@ def _resumen_carrito():
     for producto, cantidad in carrito.items():
         datos_producto = obtener_producto(producto)
         precio = datos_producto["precio"] if datos_producto else 0
+        stock = datos_producto["stock"] if datos_producto else 0
         subtotal = precio * cantidad
         total += subtotal
         lineas.append({
             "producto": producto,
             "cantidad": cantidad,
             "precio": precio,
-            "subtotal": subtotal
+            "subtotal": subtotal,
+            "stock": stock
         })
 
     return {
@@ -127,21 +136,108 @@ def _validar_carrito(carrito):
 
 @cliente_bp.route("/")
 def pagina_principal():
-    productos = obtener_productos_en_venta()
+    # Esta ya no muestra productos directamente — muestra la botonera
+    # de categorías (Bebidas, Snacks, etc.), y solo las que tienen al
+    # menos un producto a la venta ahora mismo.
+    categorias = obtener_categorias_raiz_con_productos()
     resumen = _resumen_carrito()
-    mensaje_inicial = request.args.get("mensaje", "Esperando tu selección...")
+    mensaje = request.args.get("mensaje")
+
+    return render_template(
+        "categorias.html",
+        categorias=categorias,
+        resumen=resumen,
+        mensaje=mensaje
+    )
+
+
+@cliente_bp.route("/categoria/<categoria_id>")
+def ver_categoria(categoria_id):
+    if categoria_id == "otros":
+        productos = obtener_productos_en_venta_sin_categoria()
+        resumen = _resumen_carrito()
+        return render_template(
+            "tienda.html",
+            inventario=productos,
+            categoria_nombre="Otros",
+            volver_a="/",
+            resumen=resumen
+        )
+
+    categoria_id_numero = int(categoria_id)
+    categoria = obtener_categoria(categoria_id_numero)
+    nombre_categoria = categoria["nombre"] if categoria else "Categoría"
+
+    # A dónde tiene que volver el botón "atrás": si esta categoría tiene
+    # padre, vuelve a la pantalla de subcategorías de ese padre. Si no
+    # tiene padre (es una categoría raíz), vuelve directo al inicio.
+    padre_id = categoria["categoria_padre_id"] if categoria else None
+    volver_a = f"/categoria/{padre_id}" if padre_id is not None else "/"
+
+    subcategorias = obtener_subcategorias_directas(categoria_id_numero)
+    resumen = _resumen_carrito()
+
+    if subcategorias:
+        # Nivel intermedio: esta categoría tiene hijas, así que
+        # mostramos SUS botones — no bajamos directo a productos
+        # todavía. También traemos los productos asignados
+        # DIRECTAMENTE a esta categoría (sin pasar por ninguna
+        # subcategoría), por si hay alguno — si no, esa lista queda
+        # vacía y la plantilla simplemente no muestra esa sección.
+        productos_directos = obtener_productos_en_venta_por_categorias({categoria_id_numero})
+
+        return render_template(
+            "subcategorias.html",
+            categoria_nombre=nombre_categoria,
+            subcategorias=subcategorias,
+            productos_directos=productos_directos,
+            volver_a=volver_a,
+            resumen=resumen
+        )
+
+    # Nivel hoja: esta categoría no tiene hijas, así que mostramos sus
+    # productos directamente — no hace falta juntar descendientes,
+    # porque no tiene ninguno.
+    productos = obtener_productos_en_venta_por_categorias({categoria_id_numero})
 
     return render_template(
         "tienda.html",
         inventario=productos,
-        resumen=resumen,
-        mensaje_inicial=mensaje_inicial
+        categoria_nombre=nombre_categoria,
+        volver_a=volver_a,
+        resumen=resumen
     )
 
 
 @cliente_bp.route("/estado")
 def estado_actual():
     return jsonify(obtener_productos_en_venta())
+
+
+def _ajustar_cantidad_carrito(producto, delta):
+    # Función interna que usan TODAS las rutas que cambian una cantidad
+    # (agregar, sumar de a uno, restar de a uno) — es el único lugar
+    # donde vive la regla "nunca más de lo que hay en stock". Si esta
+    # regla viviera repetida en cada ruta, alguna se nos podría escapar
+    # y quedaría un agujero por donde comprar de más.
+    datos_producto = obtener_producto(producto)
+    stock_disponible = datos_producto["stock"] if datos_producto else 0
+
+    carrito = _obtener_carrito()
+    cantidad_actual = carrito.get(producto, 0)
+    nueva_cantidad = cantidad_actual + delta
+
+    # max(0, ...) evita que baje de cero; min(..., stock_disponible)
+    # evita que suba más del stock real, sin importar cuántas veces se
+    # apriete "+" — el límite se aplica siempre, no solo la primera vez.
+    nueva_cantidad = max(0, min(nueva_cantidad, stock_disponible))
+
+    if nueva_cantidad <= 0:
+        carrito.pop(producto, None)
+    else:
+        carrito[producto] = nueva_cantidad
+
+    session["carrito"] = carrito
 
 
 @cliente_bp.route("/carrito/agregar", methods=["POST"])
@@ -151,9 +247,7 @@ def carrito_agregar():
     cantidad = int(datos.get("cantidad", 0))
 
     if cantidad > 0:
-        carrito = _obtener_carrito()
-        carrito[producto] = carrito.get(producto, 0) + cantidad
-        session["carrito"] = carrito
+        _ajustar_cantidad_carrito(producto, cantidad)
 
     return jsonify(_resumen_carrito())
 
@@ -177,6 +271,27 @@ def carrito_quitar_form():
     carrito = _obtener_carrito()
     carrito.pop(producto, None)
     session["carrito"] = carrito
+
+    return redirect(url_for("cliente.ver_carrito"))
+
+
+@cliente_bp.route("/carrito/ajustar", methods=["POST"])
+def carrito_ajustar():
+    datos = request.get_json()
+    producto = datos.get("producto")
+    delta = int(datos.get("delta", 0))
+
+    _ajustar_cantidad_carrito(producto, delta)
+
+    return jsonify(_resumen_carrito())
+
+
+@cliente_bp.route("/carrito/ajustar-form", methods=["POST"])
+def carrito_ajustar_form():
+    producto = request.form.get("producto")
+    delta = int(request.form.get("delta", 0))
+
+    _ajustar_cantidad_carrito(producto, delta)
 
     return redirect(url_for("cliente.ver_carrito"))
 

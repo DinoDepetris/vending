@@ -13,7 +13,21 @@
             {% for linea in resumen.lineas %}
             <tr>
                 <td>{{ linea.producto }}</td>
-                <td>{{ linea.cantidad }}</td>
+                <td>
+                    <div class="stepper-mini">
+                        <form method="POST" action="/carrito/ajustar-form">
+                            <input type="hidden" name="producto" value="{{ linea.producto }}">
+                            <input type="hidden" name="delta" value="-1">
+                            <button type="submit">−</button>
+                        </form>
+                        <span>{{ linea.cantidad }}</span>
+                        <form method="POST" action="/carrito/ajustar-form">
+                            <input type="hidden" name="producto" value="{{ linea.producto }}">
+                            <input type="hidden" name="delta" value="1">
+                            <button type="submit" {% if linea.cantidad >= linea.stock %}disabled{% endif %}>+</button>
+                        </form>
+                    </div>
+                </td>
                 <td>${{ linea.subtotal }}</td>
                 <td>
                     <form method="POST" action="/carrito/quitar-form">

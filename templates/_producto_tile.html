@@ -1,0 +1,35 @@
+<!-- Esto asume que "nombre" y "datos" ya están definidos por el bucle
+     de la plantilla que lo incluye — Jinja comparte el contexto de la
+     plantilla que hace el include, así que no hace falta pasarle nada
+     explícitamente. -->
+<div class="producto-tile {% if datos.stock <= 0 %}agotado{% endif %}" id="producto-{{ nombre }}">
+    <div class="producto-imagen">
+        {% if datos.imagen %}
+            <img src="{{ url_for('static', filename='productos/' + datos.imagen) }}" alt="{{ nombre }}">
+        {% else %}
+            <i class="ti ti-photo" aria-hidden="true"></i>
+        {% endif %}
+    </div>
+    <div class="producto-tile-info">
+        <p class="producto-tile-nombre">{{ nombre }}</p>
+
+        <div class="producto-tile-precio-cantidad">
+            <span class="producto-tile-precio">${{ datos.precio }}</span>
+            <div class="stepper-mini">
+                <span onclick="cambiarCantidadTile('{{ nombre }}', -1)">−</span>
+                <span id="cantidad-{{ nombre }}">1</span>
+                <span onclick="cambiarCantidadTile('{{ nombre }}', 1)">+</span>
+            </div>
+        </div>
+
+        <button class="btn-agregar-tile"
+                onclick="agregarConCantidad('{{ nombre }}')"
+                {% if datos.stock <= 0 %}disabled{% endif %}>
+            <i class="ti ti-shopping-cart-plus" aria-hidden="true"></i> Agregar
+        </button>
+    </div>
+
+    {% if datos.stock <= 0 %}
+        <span class="producto-tile-etiqueta">Sin stock</span>
+    {% endif %}
+</div>
