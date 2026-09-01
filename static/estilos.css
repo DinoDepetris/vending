@@ -314,12 +314,20 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
 }
 
 .producto-imagen img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+
+    /* Este "zoom" del 20% compensa que las fotos generadas suelen traer
+       margen de sobra alrededor del producto (aunque le pidamos a la IA
+       que lo llene bien) — así el producto se ve más grande y
+       protagonista en la tarjeta, sin depender de que cada foto venga
+       perfectamente encuadrada desde el origen. */
+    transform: scale(1.2);
 }
 
 .producto-imagen i {
