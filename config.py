@@ -32,6 +32,12 @@ UMBRAL_STOCK_BAJO = 2
 # activamente en vez de dejar al cliente esperando indefinidamente.
 UMBRAL_SEGUNDOS_PAGO_PENDIENTE = 60
 
+# Si nadie toca la pantalla durante esta cantidad de segundos, el
+# sistema vuelve solo a la pantalla de reposo (para mostrar publicidad
+# a futuro, y para que la máquina nunca quede "perdida" en una
+# subcategoría después de que alguien se fue sin comprar).
+TIEMPO_INACTIVIDAD_SEGUNDOS = 40
+
 # Las credenciales de email son datos sensibles de verdad — mucho más
 # que la contraseña del panel de admin — así que viven en un archivo
 # APARTE, config_secretos.py, que está en el .gitignore y nunca se sube

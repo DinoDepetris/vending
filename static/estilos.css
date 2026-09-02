@@ -25,9 +25,18 @@ body {
     font-family: 'Inter', sans-serif;
     background: var(--color-fondo);
     color: var(--color-texto);
-    max-width: 420px;
+
+    /* Antes esto decía 420px — un ancho pensado para celular, que en tu
+       tablet real (979px de ancho útil) dejaba más de la mitad de la
+       pantalla vacía. 960px es un techo generoso: en tu tablet actual
+       prácticamente la llena (quedan ~10px de margen a cada lado), y si
+       el día de mañana usás una tablet más grande, el diseño simplemente
+       se despliega hasta ese techo en vez de quedar angosto — no hace
+       falta tocar este número de nuevo salvo que uses una pantalla
+       todavía más ancha que 960px.*/
+    max-width: 960px;
     margin: 0 auto;
-    padding-bottom: 24px;
+    padding: 0 16px 24px;
 }
 
 h2, h3 {
@@ -80,7 +89,6 @@ a {
     text-align: center;
     color: var(--color-texto-suave);
     margin-top: 40px;
-    padding: 0 20px;
 }
 
 /* --- Encabezado, compartido por categorías y tienda --- */
@@ -89,7 +97,7 @@ a {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 22px 20px 4px;
+    padding: 22px 0 4px;
 }
 
 .header-titulo-con-volver {
@@ -229,6 +237,47 @@ a {
     padding: 2px 4px;
 }
 
+/* --- Pantalla de reposo --- */
+/* A diferencia del resto de las pantallas, esta ocupa TODA la
+   ventana, sin el ancho máximo ni el padding lateral del body general
+   — pensado para que, cuando más adelante haya un video de fondo, se
+   vea a pantalla completa de verdad, no dentro de una columna angosta
+   en el medio. */
+body.pantalla-reposo {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: var(--color-primario);
+    color: var(--color-fondo);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.reposo-contenido {
+    text-align: center;
+}
+
+.reposo-contenido i {
+    font-size: 64px;
+}
+
+.reposo-titulo {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 28px;
+    margin: 16px 0 4px;
+}
+
+.reposo-subtitulo {
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    opacity: 0.85;
+    margin: 0;
+}
+
 .stepper-deshabilitado {
     opacity: 0.3;
     pointer-events: none;
@@ -255,9 +304,17 @@ a {
 
 #grilla-categorias {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+
+    /* repeat(auto-fill, ...) le dice al navegador: "poné tantas
+       columnas de 150px o más como entren en el ancho disponible".
+       Antes era "1fr 1fr" (siempre exactamente 2, sin importar cuánto
+       espacio hubiera) — con esto, en tu tablet real van a entrar 5 o 6
+       categorías por fila en vez de 2, aprovechando el ancho de
+       verdad. Y si algún día usás una pantalla angosta, se acomoda
+       solo a menos columnas, sin que haga falta tocar el CSS de nuevo. */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 12px;
-    padding: 16px 20px 20px;
+    padding: 16px 0 20px;
 }
 
 .categoria-tile {
@@ -289,9 +346,9 @@ a {
 
 #grilla-productos {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 12px;
-    padding: 14px 20px 16px;
+    padding: 14px 0 16px;
 }
 
 .producto-tile {

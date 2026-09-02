@@ -22,11 +22,23 @@ from datos.categorias import (
 )
 from simuladores import arduino, autorizar_pago_en_servidor
 from notificaciones import enviar_alerta_stock_bajo
-from config import UMBRAL_STOCK_BAJO, MERCADOPAGO_HABILITADO, UMBRAL_SEGUNDOS_PAGO_PENDIENTE
+from config import UMBRAL_STOCK_BAJO, MERCADOPAGO_HABILITADO, UMBRAL_SEGUNDOS_PAGO_PENDIENTE, TIEMPO_INACTIVIDAD_SEGUNDOS
 from pagos_mercadopago import crear_pago_con_qr, obtener_pagos_de_referencia, cancelar_pago
 from datos.incidentes import registrar_incidente
 
 cliente_bp = Blueprint("cliente", __name__)
+
+
+# ---------------------------------------------------------------------------
+# RUTA TEMPORAL DE DIAGNÓSTICO — sacar cuando ya no haga falta
+# ---------------------------------------------------------------------------
+# Sirve para una sola cosa: que la propia tablet nos diga en qué medida
+# real está mostrando la página, en vez de adivinarlo desde la ficha
+# técnica del fabricante (que da los píxeles FÍSICOS, no los que
+# realmente usa el navegador para calcular tamaños).
+@cliente_bp.route("/debug-pantalla")
+def debug_pantalla():
+    return render_template("debug_pantalla.html")
 
 
 def _obtener_carrito():
@@ -147,7 +159,8 @@ def pagina_principal():
         "categorias.html",
         categorias=categorias,
         resumen=resumen,
-        mensaje=mensaje
+        mensaje=mensaje,
+        tiempo_inactividad=TIEMPO_INACTIVIDAD_SEGUNDOS
     )
 
 
@@ -161,7 +174,8 @@ def ver_categoria(categoria_id):
             inventario=productos,
             categoria_nombre="Otros",
             volver_a="/",
-            resumen=resumen
+            resumen=resumen,
+            tiempo_inactividad=TIEMPO_INACTIVIDAD_SEGUNDOS
         )
 
     categoria_id_numero = int(categoria_id)
@@ -192,7 +206,8 @@ def ver_categoria(categoria_id):
             subcategorias=subcategorias,
             productos_directos=productos_directos,
             volver_a=volver_a,
-            resumen=resumen
+            resumen=resumen,
+            tiempo_inactividad=TIEMPO_INACTIVIDAD_SEGUNDOS
         )
 
     # Nivel hoja: esta categoría no tiene hijas, así que mostramos sus
@@ -205,7 +220,8 @@ def ver_categoria(categoria_id):
         inventario=productos,
         categoria_nombre=nombre_categoria,
         volver_a=volver_a,
-        resumen=resumen
+        resumen=resumen,
+        tiempo_inactividad=TIEMPO_INACTIVIDAD_SEGUNDOS
     )
 
 
@@ -299,7 +315,19 @@ def carrito_ajustar_form():
 @cliente_bp.route("/carrito")
 def ver_carrito():
     resumen = _resumen_carrito()
-    return render_template("carrito.html", resumen=resumen)
+    return render_template(
+        "carrito.html",
+        resumen=resumen,
+        tiempo_inactividad=TIEMPO_INACTIVIDAD_SEGUNDOS
+    )
+
+
+@cliente_bp.route("/reposo")
+def pantalla_reposo():
+    # Esta pantalla es a propósito la única que NO incluye el
+    # temporizador de inactividad — ya está en reposo, no tiene a
+    # dónde más "caer". Cualquier toque la manda de vuelta al inicio.
+    return render_template("reposo.html")
 
 
 @cliente_bp.route("/carrito/pagar", methods=["POST"])

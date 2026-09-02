@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnóstico de pantalla</title>
+</head>
+<body style="font-family: sans-serif; text-align: center; padding: 40px 20px;">
+    <h2>Datos reales de esta pantalla</h2>
+
+    <div id="resultado" style="font-size: 20px; line-height: 2;"></div>
+
+    <script>
+        // window.innerWidth/innerHeight son los "píxeles CSS" que
+        // realmente usa el navegador para calcular tamaños de letra y
+        // botones — son distintos de los píxeles físicos que suele
+        // publicar el fabricante, porque el sistema operativo aplica
+        // un factor de escala (devicePixelRatio) según qué tan densa
+        // sea la pantalla.
+        const ancho = window.innerWidth;
+        const alto = window.innerHeight;
+        const escala = window.devicePixelRatio;
+
+        document.getElementById("resultado").innerHTML = `
+            Ancho útil: <strong>${ancho}px</strong><br>
+            Alto útil: <strong>${alto}px</strong><br>
+            Factor de escala (devicePixelRatio): <strong>${escala}</strong><br>
+            <br>
+            Píxeles físicos aproximados: <strong>${Math.round(ancho * escala)} x ${Math.round(alto * escala)}</strong>
+        `;
+    </script>
+
+    <p style="color: #888; margin-top: 40px;">
+        Sacale una foto a esta pantalla y mandámela — con esos tres números calibro todo.
+    </p>
+</body>
+</html>

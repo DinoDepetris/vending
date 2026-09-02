@@ -1,0 +1,30 @@
+<script>
+    // Convertimos el umbral (que viene en segundos desde config.py, más
+    // fácil de leer para un humano) a milisegundos, que es lo que
+    // entiende setTimeout de JavaScript.
+    const TIEMPO_INACTIVIDAD_MS = {{ tiempo_inactividad }} * 1000;
+    let temporizadorInactividad;
+
+    function reiniciarTemporizadorInactividad() {
+        // Cada vez que se llama a esta función, cancelamos la cuenta
+        // regresiva anterior y arrancamos una nueva de cero — por eso
+        // alcanza con "escuchar" cualquier interacción y llamarla, sin
+        // tener que llevar la cuenta manualmente de cuánto pasó.
+        clearTimeout(temporizadorInactividad);
+        temporizadorInactividad = setTimeout(() => {
+            window.location.href = "/reposo";
+        }, TIEMPO_INACTIVIDAD_MS);
+    }
+
+    // Cualquiera de estos eventos cuenta como "hay alguien acá" — no
+    // solo los clics, también mover el dedo por la pantalla (scroll,
+    // touchmove) sin llegar a tocar ningún botón puntual.
+    ["click", "touchstart", "touchmove", "mousemove", "keydown", "scroll"].forEach(evento => {
+        document.addEventListener(evento, reiniciarTemporizadorInactividad);
+    });
+
+    // Arrancamos la cuenta regresiva apenas carga la página — si no,
+    // alguien podría quedarse mirando sin tocar nada desde el primer
+    // segundo y el temporizador nunca se activaría.
+    reiniciarTemporizadorInactividad();
+</script>
