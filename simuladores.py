@@ -13,7 +13,7 @@ cambiar ni una línea ese día.
 import time
 import random
 
-from config import ARDUINO_HABILITADO, ARDUINO_PUERTO
+from config import ARDUINO_HABILITADO, ARDUINO_PUERTO, ARDUINO_TIMEOUT_SEGUNDOS
 
 
 class ArduinoSimulado:
@@ -65,6 +65,6 @@ def autorizar_pago_en_servidor(monto):
 # arduino.abrir_compuerta(slot) sin distinción.
 if ARDUINO_HABILITADO:
     from arduino_real import ArduinoReal
-    arduino = ArduinoReal(ARDUINO_PUERTO)
+    arduino = ArduinoReal(ARDUINO_PUERTO, timeout_segundos=ARDUINO_TIMEOUT_SEGUNDOS)
 else:
     arduino = ArduinoSimulado()

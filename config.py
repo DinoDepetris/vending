@@ -60,8 +60,6 @@ except ImportError:
 
 # Mismo patrón para el Access Token de MercadoPago: nunca en este
 # archivo, siempre en config_secretos.py (que está en el .gitignore).
-# Mismo patrón para el Access Token de MercadoPago: nunca en este
-# archivo, siempre en config_secretos.py (que está en el .gitignore).
 try:
     from config_secretos import MERCADOPAGO_ACCESS_TOKEN
     MERCADOPAGO_HABILITADO = True
@@ -84,3 +82,14 @@ ARDUINO_HABILITADO = False
 # Se confirma corriendo "ls /dev/tty*" antes y después de enchufarlo:
 # el nombre nuevo que aparece (típicamente ttyACM0) es este.
 ARDUINO_PUERTO = "/dev/ttyACM0"
+
+# Cuánto tiempo (en segundos) esperamos como máximo la respuesta del
+# Arduino antes de darlo por perdido. Tiene que alcanzar de sobra para
+# el peor caso: mover el carro hasta la puerta MÁS lejana del punto de
+# home. Con el motor de prueba (28BYJ-48, lento) y 5 puertas, ese peor
+# caso ronda los 20 segundos — por eso dejamos bastante margen.
+#
+# Cuando pases al motor definitivo (NEMA17), que es mucho más rápido,
+# vas a poder bajar este número bastante — no hay ninguna necesidad
+# de dejarlo tan alto ahí, salvo que agregues muchas más puertas.
+ARDUINO_TIMEOUT_SEGUNDOS = 30
