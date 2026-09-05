@@ -51,6 +51,17 @@
                     window.location.href = "/";
                     return;
                 }
+
+                // "en_cola" o "en_progreso": actualizamos el mensaje
+                // según cuál sea, así el cliente entiende si su
+                // pedido ya está siendo atendido o si hay uno antes
+                // en la fila.
+                const mensaje = document.getElementById("mensaje-progreso");
+                if (datos.estado === "en_cola") {
+                    mensaje.innerText = "Ya se acreditó tu pago. Hay un pedido en curso — el tuyo se entregará apenas termine.";
+                } else if (datos.estado === "en_progreso") {
+                    mensaje.innerText = "Preparando tu pedido, esperá un momento...";
+                }
             } catch (error) {
                 // Mismo espíritu que en pagando.html: un error de red
                 // pasajero no debe cortar el polling entero, así que

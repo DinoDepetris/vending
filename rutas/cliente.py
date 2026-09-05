@@ -8,6 +8,7 @@ si algo del lado de MercadoPago fallara, el vending sigue pudiendo
 
 import time
 import threading
+import queue
 import uuid
 
 from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for
@@ -121,29 +122,39 @@ def _entregar_carrito(detalles):
 _entregas_en_progreso = {}
 
 # Un "lock" evita que dos hilos lean/escriban este diccionario al
-# mismo tiempo y lo dejen en un estado inconsistente — poco probable
-# en un vending con un solo cliente comprando a la vez, pero es la
-# forma correcta de compartir datos entre hilos.
+# mismo tiempo y lo dejen en un estado inconsistente.
 _entregas_lock = threading.Lock()
 
+# Cola FIFO ("primero que entra, primero que sale"): todas las
+# entregas pasan por acá, y las procesa UN SOLO hilo trabajador, una
+# por vez, en el mismo orden en que llegaron. Esto refleja la
+# realidad física del sistema: hay un solo carro y un solo Arduino, así
+# que no tiene sentido (ni es seguro) que dos entregas le hablen al
+# mismo tiempo — mejor que hagan fila, como harían dos clientes reales
+# parados frente a la máquina.
+_cola_entregas = queue.Queue()
 
-def _iniciar_entrega_en_segundo_plano(detalles):
-    # Arranca la entrega real (que puede tardar varios segundos —
-    # tantos como puertas tenga que abrir el Arduino) en un hilo
-    # aparte, en vez de hacer esperar al cliente con la respuesta HTTP
-    # colgada todo ese tiempo. Devuelve un token que sirve para
-    # consultar más tarde, desde /carrito/estado-entrega, si ya
-    # terminó y con qué resultado.
-    token = uuid.uuid4().hex
 
-    with _entregas_lock:
-        _entregas_en_progreso[token] = {"estado": "en_progreso"}
+def _trabajador_de_entregas():
+    # Este hilo vive para siempre, corriendo de fondo desde que
+    # arranca la app. queue.get() se queda esperando sin gastar CPU
+    # hasta que aparezca algo nuevo en la cola; lo procesa, y vuelve a
+    # esperar el siguiente — uno por vez, en orden de llegada.
+    while True:
+        token, detalles = _cola_entregas.get()
 
-    def trabajo():
-        # Esta función es la que efectivamente corre "en paralelo",
-        # en su propio hilo — mientras tanto, el resto de la app sigue
-        # respondiendo otras peticiones con total normalidad.
+        # Recién ahora, cuando el trabajador efectivamente empieza a
+        # ocuparse de ESTA entrega (y no antes, mientras esperaba su
+        # turno en la cola), la marcamos como "en_progreso". Antes de
+        # esto estaba en "en_cola" — la diferencia es lo que le
+        # permite a la pantalla del cliente mostrar "hay un pedido
+        # antes que el tuyo" en vez de "preparando tu pedido" cuando
+        # todavía ni arrancó.
+        with _entregas_lock:
+            _entregas_en_progreso[token]["estado"] = "en_progreso"
+
         entregas, fallidos = _entregar_carrito(detalles)
+
         with _entregas_lock:
             _entregas_en_progreso[token] = {
                 "estado": "completo",
@@ -151,8 +162,30 @@ def _iniciar_entrega_en_segundo_plano(detalles):
                 "fallidos": fallidos
             }
 
-    hilo = threading.Thread(target=trabajo, daemon=True)
-    hilo.start()
+        _cola_entregas.task_done()
+
+
+# Arrancamos el único hilo trabajador acá mismo, una sola vez, apenas
+# se importa este archivo (que ocurre una vez por proceso, cuando
+# Flask arma la aplicación). daemon=True para que este hilo no le
+# impida cerrar al proceso si hiciera falta.
+threading.Thread(target=_trabajador_de_entregas, daemon=True).start()
+
+
+def _iniciar_entrega_en_segundo_plano(detalles):
+    # Ya no arranca un hilo nuevo por cada compra (eso era lo que
+    # permitía que dos entregas corrieran "en paralelo" compitiendo
+    # por el mismo Arduino). En cambio, anota esta entrega en la cola
+    # FIFO, y el único hilo trabajador (_trabajador_de_entregas) la va
+    # a ir tomando cuando le toque el turno. Devuelve un token, igual
+    # que antes, para poder consultar el progreso desde
+    # /carrito/estado-entrega.
+    token = uuid.uuid4().hex
+
+    with _entregas_lock:
+        _entregas_en_progreso[token] = {"estado": "en_cola"}
+
+    _cola_entregas.put((token, detalles))
 
     return token
 
@@ -567,4 +600,8 @@ def estado_entrega():
             "fallidos": resultado["fallidos"]
         })
 
-    return jsonify({"estado": "en_progreso"})
+    # Acá puede venir "en_cola" (todavía no le tocó el turno) o
+    # "en_progreso" (el hilo trabajador ya está con esta entrega ahora
+    # mismo) — se lo pasamos tal cual al navegador, así la pantalla
+    # puede distinguir un caso del otro.
+    return jsonify({"estado": resultado["estado"]})
