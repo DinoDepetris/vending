@@ -7,6 +7,8 @@ si algo del lado de MercadoPago fallara, el vending sigue pudiendo
 """
 
 import time
+import threading
+import uuid
 
 from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for
 
@@ -108,6 +110,51 @@ def _entregar_carrito(detalles):
             })
 
     return entregas, sorted(set(productos_fallidos))
+
+
+# Acá guardamos, en memoria, el estado de cada entrega que está
+# corriendo en un hilo aparte. Un hilo de Python no tiene acceso
+# directo a la sesión del navegador (la sesión es propia de cada
+# request HTTP) — por eso usamos un "token" como puente: se lo
+# guardamos al cliente en su sesión, y con ese token después puede
+# preguntar acá adentro cómo va su entrega.
+_entregas_en_progreso = {}
+
+# Un "lock" evita que dos hilos lean/escriban este diccionario al
+# mismo tiempo y lo dejen en un estado inconsistente — poco probable
+# en un vending con un solo cliente comprando a la vez, pero es la
+# forma correcta de compartir datos entre hilos.
+_entregas_lock = threading.Lock()
+
+
+def _iniciar_entrega_en_segundo_plano(detalles):
+    # Arranca la entrega real (que puede tardar varios segundos —
+    # tantos como puertas tenga que abrir el Arduino) en un hilo
+    # aparte, en vez de hacer esperar al cliente con la respuesta HTTP
+    # colgada todo ese tiempo. Devuelve un token que sirve para
+    # consultar más tarde, desde /carrito/estado-entrega, si ya
+    # terminó y con qué resultado.
+    token = uuid.uuid4().hex
+
+    with _entregas_lock:
+        _entregas_en_progreso[token] = {"estado": "en_progreso"}
+
+    def trabajo():
+        # Esta función es la que efectivamente corre "en paralelo",
+        # en su propio hilo — mientras tanto, el resto de la app sigue
+        # respondiendo otras peticiones con total normalidad.
+        entregas, fallidos = _entregar_carrito(detalles)
+        with _entregas_lock:
+            _entregas_en_progreso[token] = {
+                "estado": "completo",
+                "entregas": entregas,
+                "fallidos": fallidos
+            }
+
+    hilo = threading.Thread(target=trabajo, daemon=True)
+    hilo.start()
+
+    return token
 
 
 def _validar_carrito(carrito):
@@ -376,10 +423,11 @@ def carrito_pagar():
         session["carrito"] = {}
         return redirect(url_for("cliente.pagina_principal", mensaje="Pago rechazado, probá de nuevo"))
 
-    entregas, fallidos = _entregar_carrito(detalles)
+    token = _iniciar_entrega_en_segundo_plano(detalles)
+    session["token_entrega"] = token
     session["carrito"] = {}
 
-    return render_template("confirmacion.html", entregas=entregas, fallidos=fallidos)
+    return render_template("confirmacion.html", detalles=detalles)
 
 
 # ---------------------------------------------------------------------------
@@ -402,10 +450,11 @@ def carrito_pagar_simulado():
     if redireccion_si_error:
         return redireccion_si_error
 
-    entregas, fallidos = _entregar_carrito(detalles)
+    token = _iniciar_entrega_en_segundo_plano(detalles)
+    session["token_entrega"] = token
     session["carrito"] = {}
 
-    return render_template("confirmacion.html", entregas=entregas, fallidos=fallidos)
+    return render_template("confirmacion.html", detalles=detalles)
 
 
 @cliente_bp.route("/carrito/estado-pago")
@@ -427,9 +476,16 @@ def estado_pago():
         return jsonify({"aprobado": False})
 
     if any(pago["status"] == "approved" for pago in pagos):
-        entregas, fallidos = _entregar_carrito(pago_pendiente["detalles"])
+        detalles = pago_pendiente["detalles"]
+        token = _iniciar_entrega_en_segundo_plano(detalles)
 
-        session["resultado_pago"] = {"entregas": entregas, "fallidos": fallidos}
+        # Guardamos el token (para consultar el progreso) y los
+        # detalles (para poder mostrar la lista de productos/puertas
+        # en la pantalla de confirmación desde el primer instante,
+        # sin tener que esperar a que la entrega termine para saber
+        # qué se estaba entregando).
+        session["token_entrega"] = token
+        session["detalles_entrega"] = detalles
         session.pop("pago_pendiente", None)
 
         return jsonify({"aprobado": True})
@@ -473,13 +529,42 @@ def estado_pago():
 
 @cliente_bp.route("/carrito/resultado")
 def ver_resultado_pago():
-    resultado = session.pop("resultado_pago", None)
+    detalles = session.pop("detalles_entrega", None)
 
-    if resultado is None:
+    if detalles is None:
         return redirect(url_for("cliente.pagina_principal"))
 
-    return render_template(
-        "confirmacion.html",
-        entregas=resultado["entregas"],
-        fallidos=resultado["fallidos"]
-    )
+    return render_template("confirmacion.html", detalles=detalles)
+
+
+@cliente_bp.route("/carrito/estado-entrega")
+def estado_entrega():
+    # Mismo patrón que estado_pago(): esta ruta la consulta el
+    # JavaScript de confirmacion.html cada 1 segundo, preguntando si
+    # el hilo de fondo que abre las puertas ya terminó.
+    token = session.get("token_entrega")
+
+    if not token:
+        return jsonify({"estado": "error"})
+
+    with _entregas_lock:
+        resultado = _entregas_en_progreso.get(token)
+
+    if resultado is None:
+        return jsonify({"estado": "error"})
+
+    if resultado["estado"] == "completo":
+        # Una vez que el cliente ya se enteró del resultado final,
+        # limpiamos — ni la sesión ni el diccionario en memoria
+        # necesitan seguir guardando esto.
+        session.pop("token_entrega", None)
+        with _entregas_lock:
+            _entregas_en_progreso.pop(token, None)
+
+        return jsonify({
+            "estado": "completo",
+            "entregas": resultado["entregas"],
+            "fallidos": resultado["fallidos"]
+        })
+
+    return jsonify({"estado": "en_progreso"})

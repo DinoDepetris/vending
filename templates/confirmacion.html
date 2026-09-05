@@ -5,44 +5,95 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
 </head>
 <body>
-    {% if entregas %}
-        <h2>¡Pago aceptado!</h2>
-        <p>Retirá:</p>
-        <ul>
-            {% for entrega in entregas %}
-            <li>{{ entrega.producto }} x{{ entrega.cantidad }} — puerta {{ entrega.slot }}</li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <h2>No se pudo entregar ningún producto</h2>
-    {% endif %}
+    <h2>¡Pago aceptado!</h2>
 
-    {% if fallidos %}
-        <p style="color: #b00020;">
-            Hubo un problema entregando: {{ fallidos | join(", ") }}. Contactá soporte.
-        </p>
-    {% endif %}
+    <p id="mensaje-progreso">Preparando tu pedido, esperá un momento...</p>
 
-    <p>Volviendo a la tienda en <span id="segundos">5</span> segundos...</p>
-    <p><a href="/">Volver ahora</a></p>
+    <ul>
+        {% for detalle in detalles %}
+        <li>{{ detalle.producto }} x{{ detalle.cantidad }} — puerta {{ detalle.slot }}</li>
+        {% endfor %}
+    </ul>
+
+    <div id="resultado-final" class="oculto">
+        <div id="bloque-sin-entregas" class="oculto">
+            <h2>No se pudo entregar ningún producto</h2>
+        </div>
+
+        <div id="bloque-fallidos" class="oculto" style="color: #b00020;">
+            <p>Hubo un problema entregando: <span id="lista-fallidos"></span>. Contactá soporte.</p>
+        </div>
+
+        <p>Volviendo a la tienda en <span id="segundos">5</span> segundos...</p>
+        <p><a href="/">Volver ahora</a></p>
+    </div>
 
     <script>
-        // Un contador simple: cada 1000ms (1 segundo) resta uno, y
-        // cuando llega a 0 redirige sola a la tienda. clearInterval
-        // corta el conteo para que no siga descontando de más una vez
-        // que ya nos fuimos de esta página.
-        let segundos = 5;
-        const span = document.getElementById("segundos");
+        // Mismo patrón de polling que ya usamos en pagando.html para
+        // el pago: cada 1 segundo preguntamos si el Arduino ya
+        // terminó de abrir las puertas, en vez de dejar al cliente
+        // esperando una respuesta HTTP colgada todo ese tiempo.
+        async function chequearEntrega() {
+            try {
+                const respuesta = await fetch("/carrito/estado-entrega");
+                const datos = await respuesta.json();
 
-        const intervalo = setInterval(() => {
-            segundos -= 1;
-            span.innerText = segundos;
+                if (datos.estado === "completo") {
+                    mostrarResultadoFinal(datos.entregas, datos.fallidos);
+                    return;
+                }
 
-            if (segundos <= 0) {
-                clearInterval(intervalo);
-                window.location.href = "/";
+                if (datos.estado === "error") {
+                    // No hay ninguna entrega en curso registrada (por
+                    // ejemplo, si alguien entra a esta página
+                    // directamente sin haber pagado) — no tiene
+                    // sentido seguir insistiendo, volvemos al inicio.
+                    window.location.href = "/";
+                    return;
+                }
+            } catch (error) {
+                // Mismo espíritu que en pagando.html: un error de red
+                // pasajero no debe cortar el polling entero, así que
+                // seguimos intentando en vez de quedarnos colgados.
+                console.error("Error consultando la entrega, reintentando:", error);
             }
-        }, 1000);
+
+            setTimeout(chequearEntrega, 1000);
+        }
+
+        function mostrarResultadoFinal(entregas, fallidos) {
+            document.getElementById("mensaje-progreso").classList.add("oculto");
+
+            if (!entregas || entregas.length === 0) {
+                document.getElementById("bloque-sin-entregas").classList.remove("oculto");
+            }
+
+            if (fallidos && fallidos.length > 0) {
+                document.getElementById("lista-fallidos").innerText = fallidos.join(", ");
+                document.getElementById("bloque-fallidos").classList.remove("oculto");
+            }
+
+            document.getElementById("resultado-final").classList.remove("oculto");
+
+            // Recién ahora, con el resultado final ya confirmado,
+            // arranca la cuenta regresiva de vuelta a la tienda —
+            // antes no correspondía, el cliente todavía tenía que
+            // esperar a que el Arduino termine su trabajo.
+            let segundos = 5;
+            const span = document.getElementById("segundos");
+
+            const intervalo = setInterval(() => {
+                segundos -= 1;
+                span.innerText = segundos;
+
+                if (segundos <= 0) {
+                    clearInterval(intervalo);
+                    window.location.href = "/";
+                }
+            }, 1000);
+        }
+
+        chequearEntrega();
     </script>
 </body>
 </html>
