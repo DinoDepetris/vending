@@ -60,9 +60,27 @@ except ImportError:
 
 # Mismo patrón para el Access Token de MercadoPago: nunca en este
 # archivo, siempre en config_secretos.py (que está en el .gitignore).
+# Mismo patrón para el Access Token de MercadoPago: nunca en este
+# archivo, siempre en config_secretos.py (que está en el .gitignore).
 try:
     from config_secretos import MERCADOPAGO_ACCESS_TOKEN
     MERCADOPAGO_HABILITADO = True
 except ImportError:
     MERCADOPAGO_ACCESS_TOKEN = None
     MERCADOPAGO_HABILITADO = False
+
+# Configuración del Arduino (control físico del carro que abre las
+# compuertas). A diferencia de las credenciales de arriba, el puerto
+# no es un dato sensible, así que puede vivir acá directo.
+#
+# En tu PC (sin el Arduino enchufado) dejá esto en False: el sistema
+# sigue usando ArduinoSimulado, como hizo siempre, así podés seguir
+# probando el resto del vending (stock, ventas, pagos) sin tener el
+# hardware a mano. Poné True recién en la Raspberry, cuando el Arduino
+# esté conectado por USB.
+ARDUINO_HABILITADO = False
+
+# Puerto donde aparece el Arduino al conectarlo por USB a la Raspberry.
+# Se confirma corriendo "ls /dev/tty*" antes y después de enchufarlo:
+# el nombre nuevo que aparece (típicamente ttyACM0) es este.
+ARDUINO_PUERTO = "/dev/ttyACM0"

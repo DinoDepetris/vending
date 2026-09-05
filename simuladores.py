@@ -13,6 +13,8 @@ cambiar ni una línea ese día.
 import time
 import random
 
+from config import ARDUINO_HABILITADO, ARDUINO_PUERTO
+
 
 class ArduinoSimulado:
     def accionar_motor(self, slot):
@@ -55,7 +57,14 @@ def autorizar_pago_en_servidor(monto):
     return random.random() < 0.85
 
 
-# Una sola instancia del Arduino simulado, compartida por todo el
-# proyecto — la importan las rutas que la necesiten, en vez de crear una
-# nueva cada vez.
-arduino = ArduinoSimulado()
+# Según lo que diga config.ARDUINO_HABILITADO, "arduino" termina
+# siendo o bien el simulador de siempre, o bien la clase que habla de
+# verdad con el hardware por puerto serie (definida en
+# arduino_real.py). El resto del proyecto (rutas/cliente.py) no
+# necesita saber cuál de las dos es — solo llama a
+# arduino.abrir_compuerta(slot) sin distinción.
+if ARDUINO_HABILITADO:
+    from arduino_real import ArduinoReal
+    arduino = ArduinoReal(ARDUINO_PUERTO)
+else:
+    arduino = ArduinoSimulado()
