@@ -46,7 +46,7 @@ class ArduinoReal:
             # abrir_compuerta() simplemente falle más adelante,
             # devolviendo False (como si el motor no hubiese
             # respondido), en vez de romper la aplicación entera.
-            print(f"[ARDUINO] No se pudo conectar en {puerto}: {error}")
+            print(f"[ARDUINO] No se pudo conectar en {self.puerto}: {error}")
             self.conexion = None
 
     def accionar_motor(self, slot):
@@ -74,7 +74,37 @@ class ArduinoReal:
             comando = f"IR:{numero_puerta}\n"
             self.conexion.write(comando.encode("utf-8"))
 
-            respuesta = self.conexion.readline().decode("utf-8").strip()
+            # El Arduino imprime varios mensajes de diagnóstico ANTES
+            # de la respuesta final (ej: "Moviendo a puerta 0",
+            # "Moviendo servo a DESBLOQUEO...", etc.) y recién al final
+            # manda "OK" o "ERROR: ...". Si leyéramos una sola línea
+            # con readline(), agarraríamos el primer mensaje de
+            # diagnóstico y nunca el "OK" real — por eso leemos en
+            # bucle, descartando las líneas que no sean la respuesta
+            # final, hasta encontrarla (o hasta quedarnos sin líneas
+            # nuevas, si el Arduino nunca contesta).
+            respuesta = ""
+            intentos_de_lectura = 0
+            maximo_intentos_de_lectura = 15  # margen de sobra para todas las líneas intermedias
+
+            while intentos_de_lectura < maximo_intentos_de_lectura:
+                linea = self.conexion.readline().decode("utf-8").strip()
+                intentos_de_lectura += 1
+
+                if linea == "":
+                    # readline() se quedó sin nada nuevo durante todo
+                    # el timeout configurado: el Arduino dejó de
+                    # mandar líneas, cortamos acá
+                    break
+
+                if linea == "OK" or linea.startswith("ERROR"):
+                    respuesta = linea
+                    break
+
+                # Cualquier otra línea es un mensaje de diagnóstico
+                # del Arduino (no es la respuesta final) — la
+                # ignoramos y seguimos leyendo la siguiente
+                print(f"[ARDUINO] (mensaje intermedio) {linea}")
 
             if respuesta == "OK":
                 return True
